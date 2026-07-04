@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — TrueGrowth CRM</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --sidebar-bg: #0f1623;
+      --brand: #1a56db;
+      --brand-dark: #1e429f;
+      --accent: #ff8800;
+      --bg: #f4f7fe;
+    }
+    * { font-family: 'Inter', sans-serif; }
+    body {
+      min-height: 100vh;
+      background: var(--sidebar-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: #fff;
+      border-radius: 20px;
+      padding: 40px 36px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+    }
+    .brand-logo {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #ff8800, #ff5500);
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 22px;
+      margin: 0 auto 16px;
+    }
+    .btn-brand {
+      background: var(--brand); color: #fff;
+      font-weight: 600; padding: 11px;
+      border-radius: 10px; border: none;
+    }
+    .btn-brand:hover { background: var(--brand-dark); color: #fff; }
+    .form-control { padding: 11px 14px; border-radius: 10px; }
+    .form-control:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(26,86,219,0.15); }
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <div class="brand-logo" aria-hidden="true">TG</div>
+    <h1 class="h4 text-center fw-bold mb-1">TrueGrowth CRM</h1>
+    <p class="text-center text-secondary mb-4" style="font-size:14px;">Sign in to your account</p>
+
+    <% if (error) { %>
+      <div class="alert alert-danger py-2" style="font-size:14px;" role="alert"><%= error %></div>
+    <% } %>
+
+    <form method="POST" action="/login">
+      <div class="mb-3">
+        <label for="email" class="form-label fw-medium" style="font-size:14px;">Email</label>
+        <input type="email" class="form-control" id="email" name="email" required autocomplete="email" autofocus>
+      </div>
+      <div class="mb-4">
+        <label for="password" class="form-label fw-medium" style="font-size:14px;">Password</label>
+        <input type="password" class="form-control" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-brand w-100">Sign In</button>
+    </form>
+
+    <p class="text-center text-secondary mt-4 mb-0" style="font-size:12px;">TrueGrowth Realty — Real Estate Sales CRM</p>
+  </main>
+</body>
+</html>

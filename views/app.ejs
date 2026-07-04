@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= page.charAt(0).toUpperCase() + page.slice(1) %> — TrueGrowth CRM</title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="/app.css" rel="stylesheet">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<%
+  const isManager = ['Admin','MD'].includes(user.role);
+  const isAdmin = user.role === 'Admin';
+  const navItems = [];
+  navItems.push({ page: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high' });
+  navItems.push({ page: 'leads', label: isManager ? 'Leads' : 'My Leads', icon: 'fa-user-group' });
+  navItems.push({ page: 'followups', label: isManager ? 'Follow-Ups' : 'My Follow-Ups', icon: 'fa-bell' });
+  if (user.role !== 'Caller') navItems.push({ page: 'bookings', label: 'Bookings', icon: 'fa-file-signature' });
+  if (isManager) {
+    navItems.push({ page: 'projects', label: 'Projects', icon: 'fa-building' });
+    navItems.push({ page: 'sources', label: 'Lead Sources', icon: 'fa-bullseye' });
+  }
+  if (isAdmin) navItems.push({ page: 'users', label: 'Users', icon: 'fa-users-gear' });
+  if (isAdmin) navItems.push({ page: 'settings', label: 'Settings', icon: 'fa-gear' });
+  if (isManager) navItems.push({ page: 'reports', label: 'Reports', icon: 'fa-chart-line' });
+  if (isAdmin) navItems.push({ page: 'audit', label: 'Audit Log', icon: 'fa-clock-rotate-left' });
+  const pageTitles = { dashboard: 'Dashboard', leads: 'Leads', followups: 'Follow-Ups', bookings: 'Bookings', projects: 'Projects', sources: 'Lead Sources', users: 'Users', settings: 'Settings', reports: 'Reports', audit: 'Audit Log' };
+  const statusColors = { 'New': 'primary', 'Working': 'warning', 'Qualified': 'info', 'Site Visit Scheduled': 'secondary', 'Negotiation': 'dark', 'Booked': 'success', 'Lost': 'danger', 'Not Interested': 'danger' };
+%>
+
+<!-- SIDEBAR -->
+<nav class="tg-sidebar" aria-label="Main navigation">
+  <div class="tg-sidebar-brand">
+    <div class="tg-logo" aria-hidden="true">TG</div>
+    <div>
+      <div class="tg-brand-name">TrueGrowth</div>
+      <div class="tg-brand-sub">Real Estate CRM</div>
+    </div>
+  </div>
+  <div class="tg-nav">
+    <% navItems.forEach(item => { %>
+      <a href="/app?page=<%= item.page %>" class="tg-nav-link <%= page === item.page ? 'active' : '' %>">
+        <i class="fa-solid <%= item.icon %>" aria-hidden="true"></i> <%= item.label %>
+      </a>
+    <% }) %>
+  </div>
+  <div class="tg-sidebar-footer">
+    <a href="/logout" class="tg-nav-link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Logout</a>
+  </div>
+</nav>
+
+<!-- TOPBAR -->
+<header class="tg-topbar">
+  <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
+  <div class="tg-profile">
+    <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
+    <span class="tg-profile-pill"><%= user.name %> <span class="badge tg-role-badge"><%= user.role %></span></span>
+  </div>
+</header>
+
+<!-- CONTENT -->
+<main class="tg-content">
+  <% if (success_msg) { %>
+    <div class="alert <%= success_msg.startsWith('Error') ? 'alert-danger' : 'alert-success' %> alert-dismissible fade show" role="alert">
+      <%= success_msg %>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+  <% } %>
+
+  <%# ======================= DASHBOARD ======================= %>
+  <% if (page === 'dashboard') { %>
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi tg-kpi-blue">
+          <div class="tg-kpi-label">Total Leads</div>
+          <div class="tg-kpi-value"><%= data.total_leads %></div>
+          <i class="fa-solid fa-user-group tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi tg-kpi-teal">
+          <div class="tg-kpi-label">New Today</div>
+          <div class="tg-kpi-value"><%= data.new_today %></div>
+          <i class="fa-solid fa-bolt tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi <%= data.overdue_followups > 0 ? 'tg-kpi-red' : 'tg-kpi-indigo' %>">
+          <div class="tg-kpi-label">Pending Follow-Ups</div>
+          <div class="tg-kpi-value"><%= data.pending_followups %></div>
+          <% if (data.overdue_followups > 0) { %><div class="tg-kpi-sub"><%= data.overdue_followups %> overdue</div><% } %>
+          <i class="fa-solid fa-bell tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-6 col-xl">
+        <div class="tg-kpi tg-kpi-orange">
+          <div class="tg-kpi-label">Bookings</div>
+          <div class="tg-kpi-value"><%= data.total_bookings %></div>
+          <i class="fa-solid fa-file-signature tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl">
+        <div class="tg-kpi tg-kpi-green">
+          <div class="tg-kpi-label">Total Revenue</div>
+          <div class="tg-kpi-value"><%= formatMoney(data.total_revenue) %></div>
+          <i class="fa-solid fa-indian-rupee-sign tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-lg-7">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Booking Trend</h2>
+          <div style="position:relative;height:260px;">
+            <canvas id="trendChart"
+              data-labels='<%- JSON.stringify(data.booking_trend.map(b => b._id)) %>'
+              data-values='<%- JSON.stringify(data.booking_trend.map(b => b.revenue)) %>'></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Leads by Status</h2>
+          <div style="position:relative;height:260px;">
+            <canvas id="statusChart"
+              data-labels='<%- JSON.stringify(data.by_status.map(s => s._id)) %>'
+              data-values='<%- JSON.stringify(data.by_status.map(s => s.count)) %>'></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Recent Leads</h2>
+          <div class="table-responsive">
+            <table class="table table-sm tg-table mb-0">
+              <thead><tr><th>Name</th><th>Source</th><th>Status</th><th>Created</th></tr></thead>
+              <tbody>
+                <% if (!data.recent_leads.length) { %>
+                  <tr><td colspan="4" class="text-secondary text-center py-4">No leads yet.</td></tr>
+                <% } %>
+                <% data.recent_leads.forEach(l => { %>
+                  <tr>
+                    <td class="fw-medium"><%= l.name %></td>
+                    <td><%= l.source_id ? l.source_id.name : '—' %></td>
+                    <td><span class="badge text-bg-<%= statusColors[l.status] || 'secondary' %>"><%= l.status %></span></td>
+                    <td class="text-secondary"><%= formatDate(l.created_at) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Quick Actions</h2>
+          <div class="d-flex flex-column gap-2">
+            <a href="/app?page=leads" class="btn btn-outline-primary text-start"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Add Lead</a>
+            <a href="/app?page=followups" class="btn btn-outline-primary text-start"><i class="fa-solid fa-bell me-2" aria-hidden="true"></i>View Follow-Ups</a>
+            <% if (user.role !== 'Caller') { %>
+              <a href="/app?page=bookings" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
+            <% } %>
+            <% if (isManager) { %>
+              <a href="/app?page=reports" class="btn btn-outline-primary text-start"><i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>View Reports</a>
+            <% } %>
+          </div>
+          <% if (isManager && data.closer_perf && data.closer_perf.length) { %>
+            <h2 class="tg-panel-title mt-4">Closer Performance</h2>
+            <% data.closer_perf.forEach(c => { %>
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <span class="fw-medium"><%= c.closer[0] ? c.closer[0].full_name : 'Unknown' %></span>
+                <span class="text-secondary" style="font-size:13px;"><%= c.count %> bookings · <%= formatMoney(c.revenue) %></span>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= LEADS ======================= %>
+  <% } else if (page === 'leads') { %>
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="search" id="leadSearch" class="form-control" style="max-width:240px;" placeholder="Search name / phone / email" aria-label="Search leads">
+        <select id="leadStatusFilter" class="form-select" style="max-width:180px;" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+        </select>
+        <select id="leadSourceFilter" class="form-select" style="max-width:180px;" aria-label="Filter by source">
+          <option value="">All Sources</option>
+          <% data.sources.forEach(s => { %><option value="<%= s.name %>"><%= s.name %></option><% }) %>
+        </select>
+        <select id="leadProjectFilter" class="form-select" style="max-width:180px;" aria-label="Filter by project">
+          <option value="">All Projects</option>
+          <% data.projects.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %>
+        </select>
+        <div class="ms-auto d-flex gap-2">
+          <% if (isManager) { %>
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal"><i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import CSV</button>
+          <% } %>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal" onclick="tgResetLeadForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Lead</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table tg-table align-middle" id="leadsTable">
+          <thead>
+            <tr><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <% if (!data.leads.length) { %>
+              <tr><td colspan="9" class="text-secondary text-center py-4">No leads found. Add your first lead to get started.</td></tr>
+            <% } %>
+            <% data.leads.forEach(lead => { %>
+              <%
+                const canEdit = isManager || String(lead.assigned_caller_id?._id || '') === user.userId || String(lead.assigned_closer_id?._id || '') === user.userId;
+              %>
+              <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+                  data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
+                <td>
+                  <div class="fw-medium"><%= lead.name %></div>
+                  <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
+                </td>
+                <td><%= lead.phone %></td>
+                <td><%= lead.source_id ? lead.source_id.name : '—' %></td>
+                <td><%= lead.project_id ? lead.project_id.name : '—' %></td>
+                <td><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
+                <td><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
+                <td><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
+                <td class="text-nowrap">
+                  <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
+                     href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
+                     title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="tgShowTimeline('<%= lead._id %>', '<%= lead.name.replace(/'/g, '') %>')" title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
+                  <% if (canEdit) { %>
+                    <form method="POST" action="/app?page=leads" style="display:inline">
+                      <input type="hidden" name="action" value="quick_disposition">
+                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
+                      <input type="hidden" name="status" value="Not Interested">
+                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Not Interested">NI</button>
+                    </form>
+                    <form method="POST" action="/app?page=leads" style="display:inline">
+                      <input type="hidden" name="action" value="quick_disposition">
+                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
+                      <input type="hidden" name="status" value="Working">
+                      <button type="submit" class="btn btn-sm btn-outline-warning" title="Call Back / Working">CB</button>
+                    </form>
+                    <form method="POST" action="/app?page=leads" style="display:inline">
+                      <input type="hidden" name="action" value="quick_disposition">
+                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
+                      <input type="hidden" name="status" value="Qualified">
+                      <button type="submit" class="btn btn-sm btn-outline-success" title="Interested / Qualified">INT</button>
+                    </form>
+                    <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead"
+                      onclick='tgEditLead(<%- JSON.stringify({
+                        _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
+                        source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
+                        budget_range: lead.budget_range || "", status: lead.status,
+                        assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
+                        assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
+                        notes: lead.notes || ""
+                      }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <% } %>
+                  <% if (isManager) { %>
+                    <a class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"
+                       href="/app?page=leads&delete=1&table=leads&id=<%= lead._id %>"
+                       onclick="return confirm('Delete this lead?')"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add/Edit Lead Modal -->
+    <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=leads">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="leadModalTitle">Add Lead</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_lead" id="leadAction">
+              <input type="hidden" name="lead_id" id="leadId">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_name">Name *</label>
+                  <input class="form-control" id="lf_name" name="name" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_phone">Phone *</label>
+                  <input class="form-control" id="lf_phone" name="phone" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_email">Email</label>
+                  <input type="email" class="form-control" id="lf_email" name="email">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_city">City</label>
+                  <input class="form-control" id="lf_city" name="city">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_source">Source *</label>
+                  <select class="form-select" id="lf_source" name="source_id" required>
+                    <option value="">Select source</option>
+                    <% data.sources.forEach(s => { %><option value="<%= s._id %>"><%= s.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_project">Project</label>
+                  <select class="form-select" id="lf_project" name="project_id">
+                    <option value="">None</option>
+                    <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_budget">Budget Range</label>
+                  <input class="form-control" id="lf_budget" name="budget_range" placeholder="e.g. 50L - 80L">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_status">Status</label>
+                  <select class="form-select" id="lf_status" name="status">
+                    <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <% if (isManager) { %>
+                  <div class="col-md-6">
+                    <label class="form-label" for="lf_caller">Caller <span class="text-secondary">(auto round-robin if blank)</span></label>
+                    <select class="form-select" id="lf_caller" name="assigned_caller_id">
+                      <option value="">Auto-assign</option>
+                      <% data.users.filter(u => u.role === 'Caller').forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %></option><% }) %>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="lf_closer">Closer</label>
+                    <select class="form-select" id="lf_closer" name="assigned_closer_id">
+                      <option value="">None</option>
+                      <% data.users.filter(u => u.role === 'Closer').forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %></option><% }) %>
+                    </select>
+                  </div>
+                <% } %>
+                <div class="col-12">
+                  <label class="form-label" for="lf_notes">Notes</label>
+                  <textarea class="form-control" id="lf_notes" name="notes" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Lead</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <% if (isManager) { %>
+    <!-- Import CSV Modal -->
+    <div class="modal fade" id="importCsvModal" tabindex="-1" aria-labelledby="importCsvTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app/import-leads" enctype="multipart/form-data">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="importCsvTitle">Import Leads (CSV)</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <p class="text-secondary" style="font-size:14px;">Expected columns: <code>name, phone, email, city, source_name, project_name, budget_range, notes</code></p>
+              <p style="font-size:14px;"><a href="#" onclick="tgDownloadSampleCsv(); return false;">Download sample template</a></p>
+              <input type="file" class="form-control" name="csv_file" accept=".csv" required aria-label="CSV file">
+              <p class="text-secondary mt-2 mb-0" style="font-size:12px;">Max 5MB. Source name must match an existing lead source. Leads are auto-assigned to callers via round-robin.</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Import</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- Timeline Offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="timelineOffcanvas" aria-labelledby="timelineTitle">
+      <div class="offcanvas-header">
+        <h2 class="offcanvas-title h5" id="timelineTitle">Lead Timeline</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body" id="timelineBody">
+        <p class="text-secondary">Loading…</p>
+      </div>
+    </div>
+
+  <%# ======================= FOLLOW-UPS ======================= %>
+  <% } else if (page === 'followups') { %>
+    <%
+      const now = new Date();
+      const sot = new Date(); sot.setHours(0,0,0,0);
+      const eot = new Date(); eot.setHours(23,59,59,999);
+      const buckets = [
+        { key: 'overdue', label: 'Overdue', cls: 'danger', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date < sot) },
+        { key: 'today', label: 'Today', cls: 'primary', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date >= sot && f.scheduled_date <= eot) },
+        { key: 'upcoming', label: 'Upcoming', cls: 'success', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date > eot) },
+        { key: 'done', label: 'Completed / Other', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
+      ];
+    %>
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#followupModal" onclick="tgResetFollowupForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Schedule Follow-Up</button>
+    </div>
+    <% buckets.forEach(bucket => { %>
+      <div class="tg-panel mb-3">
+        <h2 class="tg-panel-title text-<%= bucket.cls %>"><%= bucket.label %> <span class="badge text-bg-<%= bucket.cls %>"><%= bucket.items.length %></span></h2>
+        <% if (!bucket.items.length) { %>
+          <p class="text-secondary mb-0" style="font-size:14px;">Nothing here.</p>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table tg-table align-middle mb-0">
+              <thead><tr><th>Lead</th><th>Type</th><th>Owner</th><th>When</th><th>Notes</th><th>Outcome</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                <% bucket.items.forEach(f => { %>
+                  <tr>
+                    <td class="fw-medium"><%= f.lead_id ? f.lead_id.name : '—' %><div class="text-secondary" style="font-size:12px;"><%= f.lead_id ? f.lead_id.phone : '' %></div></td>
+                    <td><span class="badge text-bg-light border"><%= f.type %></span></td>
+                    <td><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
+                    <td style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
+                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
+                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.outcome || '—' %></td>
+                    <td><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
+                    <td class="text-nowrap">
+                      <% if (f.status === 'Pending') { %>
+                        <button class="btn btn-sm btn-outline-success" title="Mark done" onclick="tgCompleteFollowup('<%= f._id %>')">Done</button>
+                      <% } %>
+                      <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit follow-up"
+                        onclick='tgEditFollowup(<%- JSON.stringify({
+                          _id: String(f._id), lead_id: f.lead_id ? String(f.lead_id._id) : "",
+                          assigned_to_id: f.assigned_to_id ? String(f.assigned_to_id._id) : "",
+                          scheduled_date: f.scheduled_date ? new Date(f.scheduled_date).toISOString().slice(0,16) : "",
+                          type: f.type, status: f.status, outcome: f.outcome || "", notes: f.notes || ""
+                        }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                      <a class="btn btn-sm btn-outline-danger" href="/app?page=followups&delete=1&table=followups&id=<%= f._id %>"
+                         onclick="return confirm('Delete this follow-up?')" title="Delete" aria-label="Delete follow-up"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+
+    <!-- Complete follow-up hidden form -->
+    <form method="POST" action="/app?page=followups" id="completeFuForm" class="d-none">
+      <input type="hidden" name="action" value="complete_followup">
+      <input type="hidden" name="followup_id" id="completeFuId">
+      <input type="hidden" name="outcome" id="completeFuOutcome">
+    </form>
+
+    <!-- Schedule/Edit Follow-Up Modal -->
+    <div class="modal fade" id="followupModal" tabindex="-1" aria-labelledby="followupModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=followups">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="followupModalTitle">Schedule Follow-Up</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_followup" id="fuAction">
+              <input type="hidden" name="followup_id" id="fuId">
+              <div class="mb-3">
+                <label class="form-label" for="fu_lead">Lead *</label>
+                <select class="form-select" id="fu_lead" name="lead_id" required>
+                  <option value="">Select lead</option>
+                  <% data.leads_for_fu.forEach(l => { %><option value="<%= l._id %>"><%= l.name %> (<%= l.phone %>)</option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="fu_type">Type</label>
+                <select class="form-select" id="fu_type" name="type">
+                  <% ['Call','WhatsApp','Site Visit','Meeting','Email','Other'].forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+                </select>
+              </div>
+              <% if (isManager) { %>
+                <div class="mb-3">
+                  <label class="form-label" for="fu_owner">Owner</label>
+                  <select class="form-select" id="fu_owner" name="assigned_to_id">
+                    <option value="">Me</option>
+                    <% data.users.forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> (<%= u.role %>)</option><% }) %>
+                  </select>
+                </div>
+              <% } %>
+              <div class="mb-3">
+                <label class="form-label" for="fu_date">Date &amp; Time *</label>
+                <input type="datetime-local" class="form-control" id="fu_date" name="scheduled_date" required>
+              </div>
+              <div class="mb-3" id="fuStatusWrap" style="display:none;">
+                <label class="form-label" for="fu_status">Status</label>
+                <select class="form-select" id="fu_status" name="status">
+                  <% ['Pending','Completed','Missed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3" id="fuOutcomeWrap" style="display:none;">
+                <label class="form-label" for="fu_outcome">Outcome</label>
+                <input class="form-control" id="fu_outcome" name="outcome">
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="fu_notes">Notes</label>
+                <textarea class="form-control" id="fu_notes" name="notes" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= BOOKINGS ======================= %>
+  <% } else if (page === 'bookings') { %>
+    <%
+      const paidByBooking = {};
+      data.payments.forEach(p => {
+        const k = String(p.booking_id);
+        paidByBooking[k] = (paidByBooking[k] || 0) + p.amount;
+      });
+    %>
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="search" id="bookingSearch" class="form-control" style="max-width:240px;" placeholder="Search lead / project / unit" aria-label="Search bookings">
+        <select id="bookingStatusFilter" class="form-select" style="max-width:160px;" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <% ['Tentative','Confirmed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+        </select>
+        <div class="ms-auto d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="tgExportBookingsCsv()"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Export CSV</button>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookingModal" onclick="tgResetBookingForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Booking</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table tg-table align-middle" id="bookingsTable">
+          <thead><tr><th>ID</th><th>Lead</th><th>Project</th><th>Unit</th><th>Closer</th><th>Sale Value</th><th>Booking Amt</th><th>Paid</th><th>Balance</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (!data.bookings.length) { %>
+              <tr><td colspan="12" class="text-secondary text-center py-4">No bookings yet.</td></tr>
+            <% } %>
+            <% data.bookings.forEach(b => {
+              const paid = paidByBooking[String(b._id)] || 0;
+              const balance = (b.sale_value || 0) - paid;
+            %>
+              <tr data-status="<%= b.status %>" data-search="<%= ((b.lead_id ? b.lead_id.name : '') + ' ' + (b.project_id ? b.project_id.name : '') + ' ' + (b.unit_id ? b.unit_id.unit_number : '')).toLowerCase() %>">
+                <td class="fw-medium">TG-<%= String(b._id).slice(-8).toUpperCase() %></td>
+                <td><%= b.lead_id ? b.lead_id.name : '—' %></td>
+                <td><%= b.project_id ? b.project_id.name : '—' %></td>
+                <td><%= b.unit_id ? b.unit_id.unit_number : '—' %></td>
+                <td><%= b.closer_id ? b.closer_id.full_name : '—' %></td>
+                <td><%= formatMoney(b.sale_value) %></td>
+                <td><%= formatMoney(b.booking_amount) %></td>
+                <td class="text-success"><%= formatMoney(paid) %></td>
+                <td class="<%= balance > 0 ? 'text-danger' : 'text-success' %>"><%= formatMoney(balance) %></td>
+                <td><span class="badge text-bg-<%= b.status === 'Confirmed' ? 'success' : (b.status === 'Cancelled' ? 'danger' : 'warning') %>"><%= b.status %></span></td>
+                <td style="font-size:13px;"><%= formatDate(b.booking_date) %></td>
+                <td class="text-nowrap">
+                  <a class="btn btn-sm btn-outline-secondary" href="/app/receipt/<%= b._id %>" target="_blank" rel="noopener" title="Receipt" aria-label="View receipt"><i class="fa-solid fa-receipt" aria-hidden="true"></i></a>
+                  <button class="btn btn-sm btn-outline-success" title="Add payment" onclick="tgPayBooking('<%= b._id %>', '<%= b.lead_id ? b.lead_id.name.replace(/'/g,'') : '' %>')">Pay</button>
+                  <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit booking"
+                    onclick='tgEditBooking(<%- JSON.stringify({
+                      _id: String(b._id), sale_value: b.sale_value, booking_amount: b.booking_amount,
+                      booking_date: b.booking_date ? new Date(b.booking_date).toISOString().slice(0,10) : "",
+                      status: b.status, notes: b.notes || ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=bookings&delete=1&table=bookings&id=<%= b._id %>"
+                     onclick="return confirm('Delete this booking? Unit will be released and lead returned to Negotiation.')" title="Delete" aria-label="Delete booking"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Booking Modal -->
+    <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="bookingModalTitle">Add Booking</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_booking">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_lead">Lead *</label>
+                  <select class="form-select" id="bk_lead" name="lead_id" required>
+                    <option value="">Select qualified lead</option>
+                    <% data.qualified_leads.forEach(l => { %><option value="<%= l._id %>"><%= l.name %> (<%= l.phone %>)</option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_project">Project *</label>
+                  <select class="form-select" id="bk_project" name="project_id" required onchange="tgLoadUnits(this.value)">
+                    <option value="">Select project</option>
+                    <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_unit">Unit *</label>
+                  <select class="form-select" id="bk_unit" name="unit_id" required>
+                    <option value="">Select project first</option>
+                  </select>
+                </div>
+                <% if (isManager) { %>
+                  <div class="col-md-6">
+                    <label class="form-label" for="bk_closer">Closer</label>
+                    <select class="form-select" id="bk_closer" name="closer_id">
+                      <option value="">Me</option>
+                      <% data.closers.forEach(c => { %><option value="<%= c._id %>"><%= c.full_name %></option><% }) %>
+                    </select>
+                  </div>
+                <% } %>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_sale">Sale Value (INR) *</label>
+                  <input type="number" class="form-control" id="bk_sale" name="sale_value" min="0" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_amount">Booking Amount (INR) *</label>
+                  <input type="number" class="form-control" id="bk_amount" name="booking_amount" min="0" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_date">Booking Date</label>
+                  <input type="date" class="form-control" id="bk_date" name="booking_date">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_status">Status</label>
+                  <select class="form-select" id="bk_status" name="status">
+                    <% ['Tentative','Confirmed'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="bk_notes">Notes</label>
+                  <textarea class="form-control" id="bk_notes" name="notes" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Create Booking</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Booking Modal -->
+    <div class="modal fade" id="editBookingModal" tabindex="-1" aria-labelledby="editBookingTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="editBookingTitle">Edit Booking</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="update_booking">
+              <input type="hidden" name="booking_id" id="eb_id">
+              <div class="mb-3">
+                <label class="form-label" for="eb_sale">Sale Value (INR)</label>
+                <input type="number" class="form-control" id="eb_sale" name="sale_value" min="0">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_amount">Booking Amount (INR)</label>
+                <input type="number" class="form-control" id="eb_amount" name="booking_amount" min="0">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_date">Booking Date</label>
+                <input type="date" class="form-control" id="eb_date" name="booking_date">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_status">Status</label>
+                <select class="form-select" id="eb_status" name="status">
+                  <% ['Tentative','Confirmed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="eb_notes">Notes</label>
+                <textarea class="form-control" id="eb_notes" name="notes" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="paymentModalTitle">Add Payment</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_payment">
+              <input type="hidden" name="booking_id" id="pm_booking">
+              <div class="mb-3">
+                <label class="form-label" for="pm_amount">Amount (INR) *</label>
+                <input type="number" class="form-control" id="pm_amount" name="amount" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_date">Payment Date</label>
+                <input type="date" class="form-control" id="pm_date" name="payment_date">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_method">Method</label>
+                <select class="form-select" id="pm_method" name="method">
+                  <% ['Bank Transfer','UPI','Cheque','Cash','Card','Other'].forEach(m => { %><option value="<%= m %>"><%= m %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_ref">Reference</label>
+                <input class="form-control" id="pm_ref" name="reference" placeholder="Txn ID / Cheque no.">
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="pm_notes">Notes</label>
+                <input class="form-control" id="pm_notes" name="notes">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Record Payment</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= PROJECTS ======================= %>
+  <% } else if (page === 'projects') { %>
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#projectModal" onclick="tgResetProjectForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Project</button>
+    </div>
+    <div class="row g-3">
+      <% if (!data.projects_detail.length) { %>
+        <div class="col-12"><div class="tg-panel text-center text-secondary py-5">No projects yet. Add your first project.</div></div>
+      <% } %>
+      <% data.projects_detail.forEach(p => {
+        const pUnits = data.units.filter(u => String(u.project_id) === String(p._id));
+      %>
+        <div class="col-md-6 col-xl-4">
+          <div class="tg-panel h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h6 fw-bold mb-1"><%= p.name %></h2>
+                <div class="text-secondary" style="font-size:13px;"><%= p.developer || '—' %> · <%= [p.location, p.city].filter(Boolean).join(', ') || '—' %></div>
+              </div>
+              <span class="badge text-bg-<%= p.status === 'Ready to Move' ? 'success' : (p.status === 'Sold Out' ? 'danger' : 'info') %>"><%= p.status %></span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-3" style="font-size:13px;">
+              <span class="badge text-bg-light border"><%= p.project_type || 'Other' %></span>
+              <span class="text-secondary"><%= pUnits.filter(u => u.status === 'Available').length %>/<%= pUnits.length %> units available</span>
+              <% if (p.price_range) { %><span class="text-secondary"><%= p.price_range %></span><% } %>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#units-<%= p._id %>">Manage Units (<%= pUnits.length %>)</button>
+              <button class="btn btn-sm btn-outline-primary" aria-label="Edit project"
+                onclick='tgEditProject(<%- JSON.stringify({
+                  _id: String(p._id), name: p.name, developer: p.developer || "", location: p.location || "",
+                  city: p.city || "", state: p.state || "", project_type: p.project_type || "Other",
+                  status: p.status, total_units: p.total_units, available_units: p.available_units,
+                  price_range: p.price_range || "", notes: p.notes || ""
+                }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+              <a class="btn btn-sm btn-outline-danger" href="/app?page=projects&delete=1&table=projects&id=<%= p._id %>"
+                 onclick="return confirm('Delete this project?')" aria-label="Delete project"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+            </div>
+            <div class="collapse mt-3" id="units-<%= p._id %>">
+              <div class="table-responsive">
+                <table class="table table-sm tg-table mb-2">
+                  <thead><tr><th>Unit</th><th>BHK</th><th>Sqft</th><th>Price</th><th>Status</th><th></th></tr></thead>
+                  <tbody>
+                    <% if (!pUnits.length) { %><tr><td colspan="6" class="text-secondary" style="font-size:13px;">No units.</td></tr><% } %>
+                    <% pUnits.forEach(u => { %>
+                      <tr>
+                        <td><%= u.unit_number %></td>
+                        <td><%= u.bhk || '—' %></td>
+                        <td><%= u.area_sqft || '—' %></td>
+                        <td style="font-size:13px;"><%= formatMoney(u.base_price) %></td>
+                        <td><span class="badge text-bg-<%= u.status === 'Available' ? 'success' : (u.status === 'Sold' || u.status === 'Booked' ? 'danger' : 'warning') %>" style="font-size:10px;"><%= u.status %></span></td>
+                        <td class="text-nowrap">
+                          <button class="btn btn-sm btn-outline-primary py-0 px-1" aria-label="Edit unit"
+                            onclick='tgEditUnit(<%- JSON.stringify({
+                              _id: String(u._id), project_id: String(u.project_id), unit_number: u.unit_number,
+                              type: u.type || "", bhk: u.bhk || "", area_sqft: u.area_sqft || 0,
+                              base_price: u.base_price || 0, status: u.status, notes: u.notes || ""
+                            }) %>)'><i class="fa-solid fa-pen" style="font-size:11px;" aria-hidden="true"></i></button>
+                          <a class="btn btn-sm btn-outline-danger py-0 px-1" href="/app?page=projects&delete=1&table=units&id=<%= u._id %>"
+                             onclick="return confirm('Delete unit?')" aria-label="Delete unit"><i class="fa-solid fa-trash" style="font-size:11px;" aria-hidden="true"></i></a>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" onclick="tgAddUnit('<%= p._id %>')"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Unit</button>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Project Modal -->
+    <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=projects">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="projectModalTitle">Add Project</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_project" id="prAction">
+              <input type="hidden" name="project_id" id="prId">
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="pr_name">Name *</label><input class="form-control" id="pr_name" name="name" required></div>
+                <div class="col-md-6"><label class="form-label" for="pr_dev">Developer</label><input class="form-control" id="pr_dev" name="developer"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_loc">Location</label><input class="form-control" id="pr_loc" name="location"></div>
+                <div class="col-md-3"><label class="form-label" for="pr_city">City</label><input class="form-control" id="pr_city" name="city"></div>
+                <div class="col-md-3"><label class="form-label" for="pr_state">State</label><input class="form-control" id="pr_state" name="state"></div>
+                <div class="col-md-4">
+                  <label class="form-label" for="pr_type">Type</label>
+                  <select class="form-select" id="pr_type" name="project_type">
+                    <% ['Apartment','Villa','Plot','Commercial','Penthouse','Studio','Other'].forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="pr_status">Status</label>
+                  <select class="form-select" id="pr_status" name="status">
+                    <% ['Upcoming','Under Construction','Ready to Move','Sold Out'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4"><label class="form-label" for="pr_price">Price Range</label><input class="form-control" id="pr_price" name="price_range" placeholder="e.g. 60L - 1.2Cr"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_total">Total Units</label><input type="number" class="form-control" id="pr_total" name="total_units" min="0"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_avail">Available Units</label><input type="number" class="form-control" id="pr_avail" name="available_units" min="0"></div>
+                <div class="col-12"><label class="form-label" for="pr_notes">Notes</label><textarea class="form-control" id="pr_notes" name="notes" rows="2"></textarea></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Project</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unit Modal -->
+    <div class="modal fade" id="unitModal" tabindex="-1" aria-labelledby="unitModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=projects">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="unitModalTitle">Add Unit</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_unit" id="unAction">
+              <input type="hidden" name="unit_id" id="unId">
+              <input type="hidden" name="project_id" id="unProjectId">
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="un_number">Unit Number *</label><input class="form-control" id="un_number" name="unit_number" required></div>
+                <div class="col-md-6"><label class="form-label" for="un_type">Type</label><input class="form-control" id="un_type" name="type" placeholder="e.g. Apartment"></div>
+                <div class="col-md-4"><label class="form-label" for="un_bhk">BHK</label><input class="form-control" id="un_bhk" name="bhk" placeholder="e.g. 3BHK"></div>
+                <div class="col-md-4"><label class="form-label" for="un_area">Area (sqft)</label><input type="number" class="form-control" id="un_area" name="area_sqft" min="0"></div>
+                <div class="col-md-4"><label class="form-label" for="un_price">Base Price (INR)</label><input type="number" class="form-control" id="un_price" name="base_price" min="0"></div>
+                <div class="col-md-6">
+                  <label class="form-label" for="un_status">Status</label>
+                  <select class="form-select" id="un_status" name="status">
+                    <% ['Available','Blocked','Booked','Sold'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12"><label class="form-label" for="un_notes">Notes</label><input class="form-control" id="un_notes" name="notes"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Unit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= LEAD SOURCES ======================= %>
+  <% } else if (page === 'sources') { %>
+    <div class="tg-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="tg-panel-title mb-0">Lead Sources</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sourceModal" onclick="tgResetSourceForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Source</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table tg-table align-middle mb-0">
+          <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (!data.sources.length) { %><tr><td colspan="5" class="text-secondary text-center py-4">No sources yet.</td></tr><% } %>
+            <% data.sources.forEach(s => { %>
+              <tr>
+                <td class="fw-medium"><%= s.name %></td>
+                <td><span class="badge text-bg-light border"><%= s.channel || '—' %></span></td>
+                <td><span class="badge text-bg-<%= s.active ? 'success' : 'secondary' %>"><%= s.active ? 'Active' : 'Inactive' %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= s.notes || '—' %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" aria-label="Edit source"
+                    onclick='tgEditSource(<%- JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=sources&delete=1&table=sources&id=<%= s._id %>"
+                     onclick="return confirm('Delete this source?')" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Source Modal -->
+    <div class="modal fade" id="sourceModal" tabindex="-1" aria-labelledby="sourceModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=sources">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="sourceModalTitle">Add Source</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_source" id="srAction">
+              <input type="hidden" name="source_id" id="srId">
+              <div class="mb-3"><label class="form-label" for="sr_name">Name *</label><input class="form-control" id="sr_name" name="name" required placeholder="e.g. 99acres, Facebook Ads"></div>
+              <div class="mb-3">
+                <label class="form-label" for="sr_channel">Channel</label>
+                <select class="form-select" id="sr_channel" name="channel">
+                  <% ['Online','Offline','Referral','Direct'].forEach(c => { %><option value="<%= c %>"><%= c %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="sr_active" name="active" value="true" checked>
+                <label class="form-check-label" for="sr_active">Active</label>
+              </div>
+              <div class="mb-0"><label class="form-label" for="sr_notes">Notes</label><input class="form-control" id="sr_notes" name="notes"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Source</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= USERS ======================= %>
+  <% } else if (page === 'users') { %>
+    <div class="tg-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="tg-panel-title mb-0">Users</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="tgResetUserForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add User</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table tg-table align-middle mb-0">
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% data.users.forEach(u => { %>
+              <tr>
+                <td class="fw-medium"><%= u.full_name %></td>
+                <td><%= u.email %></td>
+                <td><%= u.phone || '—' %></td>
+                <td><span class="badge text-bg-<%= u.role === 'Admin' ? 'dark' : (u.role === 'MD' ? 'primary' : (u.role === 'Closer' ? 'success' : 'info')) %>"><%= u.role %></span></td>
+                <td><span class="badge text-bg-<%= u.status === 'Active' ? 'success' : 'secondary' %>"><%= u.status %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= formatDate(u.created_at) %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" aria-label="Edit user"
+                    onclick='tgEditUser(<%- JSON.stringify({ _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "", role: u.role, status: u.status }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=users&delete=1&table=users&id=<%= u._id %>"
+                     onclick="return confirm('Delete this user?')" aria-label="Delete user"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- User Modal -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=users">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="userModalTitle">Add User</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_user" id="usAction">
+              <input type="hidden" name="user_id" id="usId">
+              <div class="mb-3"><label class="form-label" for="us_name">Full Name *</label><input class="form-control" id="us_name" name="full_name" required></div>
+              <div class="mb-3"><label class="form-label" for="us_email">Email *</label><input type="email" class="form-control" id="us_email" name="email" required></div>
+              <div class="mb-3"><label class="form-label" for="us_password">Password <span class="text-secondary" id="usPasswordHint">(min 6 chars)</span></label><input type="password" class="form-control" id="us_password" name="password" autocomplete="new-password"></div>
+              <div class="mb-3"><label class="form-label" for="us_phone">Phone</label><input class="form-control" id="us_phone" name="phone"></div>
+              <div class="mb-3">
+                <label class="form-label" for="us_role">Role *</label>
+                <select class="form-select" id="us_role" name="role" required>
+                  <% ['Admin','MD','Caller','Closer'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="us_status">Status</label>
+                <select class="form-select" id="us_status" name="status">
+                  <option value="Active">Active</option><option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+  <%# ======================= SETTINGS ======================= %>
+  <% } else if (page === 'settings') { %>
+    <div class="tg-panel" style="max-width:640px;">
+      <h2 class="tg-panel-title">Company Settings</h2>
+      <form method="POST" action="/app?page=settings">
+        <input type="hidden" name="action" value="save_settings">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="st_company">Company Name</label><input class="form-control" id="st_company" name="company_name" value="<%= data.settings.company_name %>"></div>
+          <div class="col-md-3"><label class="form-label" for="st_currency">Currency</label><input class="form-control" id="st_currency" name="currency" value="<%= data.settings.currency %>"></div>
+          <div class="col-md-3"><label class="form-label" for="st_symbol">Symbol</label><input class="form-control" id="st_symbol" name="currency_symbol" value="<%= data.settings.currency_symbol %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_tax">Tax Rate (%)</label><input type="number" step="0.01" class="form-control" id="st_tax" name="tax_rate" value="<%= data.settings.tax_rate %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_bprefix">Booking Prefix</label><input class="form-control" id="st_bprefix" name="booking_prefix" value="<%= data.settings.booking_prefix %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_lprefix">Lead Prefix</label><input class="form-control" id="st_lprefix" name="lead_prefix" value="<%= data.settings.lead_prefix %>"></div>
+          <div class="col-md-6"><label class="form-label" for="st_comm">Default Commission (%)</label><input type="number" step="0.01" class="form-control" id="st_comm" name="default_commission" value="<%= data.settings.default_commission %>"></div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
+      </form>
+    </div>
+
+  <%# ======================= REPORTS ======================= %>
+  <% } else if (page === 'reports') { %>
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Lead Conversion</h2>
+      <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <input type="hidden" name="page" value="reports">
+        <div><label class="form-label mb-1" for="rp_from" style="font-size:13px;">From</label><input type="date" class="form-control" id="rp_from" name="from" value="<%= data.report_from %>"></div>
+        <div><label class="form-label mb-1" for="rp_to" style="font-size:13px;">To</label><input type="date" class="form-control" id="rp_to" name="to" value="<%= data.report_to %>"></div>
+        <button type="submit" class="btn btn-primary">Run</button>
+      </form>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.total %></div><div class="tg-mini-label">Total Leads</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.qualified %></div><div class="tg-mini-label">Qualified (<%= data.conversion_report.qual_rate %>%)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.booked %></div><div class="tg-mini-label">Booked (<%= data.conversion_report.book_rate %>%)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.funnel.length %></div><div class="tg-mini-label">Active Statuses</div></div></div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0" style="max-width:480px;">
+          <thead><tr><th>Status</th><th>Count</th></tr></thead>
+          <tbody>
+            <% data.conversion_report.funnel.forEach(f => { %>
+              <tr><td><span class="badge text-bg-<%= statusColors[f._id] || 'secondary' %>"><%= f._id %></span></td><td><%= f.count %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Follow-Up Summary</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.pending %></div><div class="tg-mini-label">Pending</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi <%= data.followup_report.overdue > 0 ? 'tg-mini-danger' : '' %>"><div class="tg-mini-value"><%= data.followup_report.overdue %></div><div class="tg-mini-label">Overdue</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.completed %></div><div class="tg-mini-label">Completed (range)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.missed %></div><div class="tg-mini-label">Missed</div></div></div>
+      </div>
+    </div>
+
+    <div class="tg-panel">
+      <h2 class="tg-panel-title">User Performance</h2>
+      <div class="table-responsive">
+        <table class="table tg-table mb-0">
+          <thead><tr><th>Name</th><th>Role</th><th>Leads</th><th>Qualified</th><th>Bookings</th><th>Revenue</th><th>Follow-Ups</th></tr></thead>
+          <tbody>
+            <% data.performance_report.forEach(p => { %>
+              <tr>
+                <td class="fw-medium"><%= p.name %></td>
+                <td><span class="badge text-bg-light border"><%= p.role %></span></td>
+                <td><%= p.leads %></td>
+                <td><%= p.qualified %></td>
+                <td><%= p.bookings %></td>
+                <td><%= formatMoney(p.revenue) %></td>
+                <td><%= p.followups %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  <%# ======================= AUDIT LOG ======================= %>
+  <% } else if (page === 'audit') { %>
+    <div class="tg-panel">
+      <h2 class="tg-panel-title">Audit Log <span class="text-secondary fw-normal" style="font-size:13px;">(last 150 entries, auto-purged after 180 days)</span></h2>
+      <div class="tg-audit-list">
+        <% if (!data.audit_logs.length) { %><p class="text-secondary">No audit entries yet.</p><% } %>
+        <% data.audit_logs.forEach(a => { %>
+          <div class="tg-audit-item">
+            <div class="tg-audit-dot tg-audit-<%= a.action %>" aria-hidden="true"></div>
+            <div>
+              <div style="font-size:14px;">
+                <span class="fw-medium"><%= a.user_email %></span>
+                <span class="badge text-bg-light border mx-1"><%= a.action %></span>
+                <span class="text-secondary"><%= a.entity %><%= a.entity_id ? ' #' + a.entity_id.slice(-6).toUpperCase() : '' %></span>
+              </div>
+              <div class="text-secondary" style="font-size:12px;"><%= formatDateTime(a.created_at) %><%= a.details && Object.keys(a.details).length ? ' · ' + JSON.stringify(a.details) : '' %></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  <% } %>
+</main>
+</body>
+</html>

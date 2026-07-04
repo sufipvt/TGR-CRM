@@ -1,0 +1,274 @@
+/* TrueGrowth CRM — custom styles beyond Bootstrap */
+
+:root {
+  --sidebar-bg:    #0f1623;
+  --sidebar-hover: #2b2dfb;
+  --brand:         #1a56db;
+  --brand-dark:    #1e429f;
+  --accent:        #ff8800;
+  --bg:            #f4f7fe;
+  --panel:         #ffffff;
+  --border:        #e5e7eb;
+  --ink:           #111827;
+  --ink-soft:      #6b7280;
+  --ok:            #059669;
+  --warn:          #d97706;
+  --danger:        #dc2626;
+  --card-radius:   16px;
+  --sidebar-w:     260px;
+  --topbar-h:      60px;
+}
+
+* { font-family: 'Inter', sans-serif; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* ---------------- Sidebar ---------------- */
+.tg-sidebar {
+  position: fixed;
+  top: 0; left: 0; bottom: 0;
+  width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  z-index: 1030;
+}
+
+.tg-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.tg-logo {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, #ff8800, #ff5500);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.tg-brand-name { color: #fff; font-weight: 700; font-size: 16px; line-height: 1.2; }
+.tg-brand-sub { color: rgba(255,255,255,0.5); font-size: 11px; }
+
+.tg-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tg-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: rgba(255,255,255,0.6);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tg-nav-link i { width: 18px; text-align: center; font-size: 14px; }
+
+.tg-nav-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
+.tg-nav-link.active { background: var(--sidebar-hover); color: #fff; }
+
+.tg-sidebar-footer {
+  padding: 12px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* ---------------- Topbar ---------------- */
+.tg-topbar {
+  position: fixed;
+  top: 0; right: 0;
+  left: var(--sidebar-w);
+  height: var(--topbar-h);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  z-index: 1020;
+}
+
+.tg-page-title { font-size: 18px; font-weight: 700; margin: 0; }
+
+.tg-profile { display: flex; align-items: center; gap: 12px; }
+.tg-welcome { color: var(--ink-soft); font-size: 13px; }
+
+.tg-profile-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tg-role-badge { background: var(--brand); font-size: 10px; }
+
+/* ---------------- Content ---------------- */
+.tg-content {
+  margin-left: var(--sidebar-w);
+  padding: calc(var(--topbar-h) + 24px) 24px 40px;
+  min-height: 100vh;
+}
+
+/* ---------------- Panels ---------------- */
+.tg-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--card-radius);
+  padding: 20px;
+}
+
+.tg-panel-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+/* ---------------- KPI cards ---------------- */
+.tg-kpi {
+  position: relative;
+  border-radius: var(--card-radius);
+  padding: 18px;
+  color: #fff;
+  overflow: hidden;
+  min-height: 104px;
+}
+
+.tg-kpi-label { font-size: 12px; opacity: 0.85; font-weight: 500; }
+.tg-kpi-value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+.tg-kpi-sub { font-size: 11px; opacity: 0.9; margin-top: 2px; }
+.tg-kpi-icon {
+  position: absolute;
+  right: 16px; bottom: 14px;
+  font-size: 30px;
+  opacity: 0.25;
+}
+
+.tg-kpi-blue   { background: linear-gradient(135deg, #1a56db, #1e429f); }
+.tg-kpi-teal   { background: linear-gradient(135deg, #0d9488, #0f766e); }
+.tg-kpi-indigo { background: linear-gradient(135deg, #4f46e5, #4338ca); }
+.tg-kpi-red    { background: linear-gradient(135deg, #dc2626, #b91c1c); }
+.tg-kpi-orange { background: linear-gradient(135deg, #ff8800, #ea580c); }
+.tg-kpi-green  { background: linear-gradient(135deg, #059669, #047857); }
+
+/* ---------------- Mini KPI (reports) ---------------- */
+.tg-mini-kpi {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
+}
+.tg-mini-value { font-size: 22px; font-weight: 700; }
+.tg-mini-label { font-size: 12px; color: var(--ink-soft); }
+.tg-mini-danger { border-color: var(--danger); }
+.tg-mini-danger .tg-mini-value { color: var(--danger); }
+
+/* ---------------- Tables ---------------- */
+.tg-table thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--ink-soft);
+  font-weight: 600;
+  border-bottom-width: 1px;
+}
+
+.tg-table td { font-size: 14px; }
+
+/* ---------------- Buttons ---------------- */
+.btn-primary { background: var(--brand); border-color: var(--brand); }
+.btn-primary:hover { background: var(--brand-dark); border-color: var(--brand-dark); }
+.btn-outline-primary { color: var(--brand); border-color: var(--brand); }
+.btn-outline-primary:hover { background: var(--brand); border-color: var(--brand); }
+
+/* ---------------- Timeline (offcanvas) ---------------- */
+.tg-timeline { position: relative; padding-left: 24px; }
+.tg-timeline::before {
+  content: '';
+  position: absolute;
+  left: 7px; top: 6px; bottom: 6px;
+  width: 2px;
+  background: var(--border);
+}
+
+.tg-timeline-item { position: relative; padding-bottom: 18px; }
+.tg-timeline-dot {
+  position: absolute;
+  left: -24px; top: 4px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.tg-dot-created       { background: var(--brand); }
+.tg-dot-qualified     { background: #0d9488; }
+.tg-dot-booked        { background: var(--ok); }
+.tg-dot-booking       { background: var(--accent); }
+.tg-dot-followup      { background: var(--warn); }
+.tg-dot-followup_done { background: var(--ok); }
+.tg-dot-audit         { background: var(--ink-soft); }
+
+.tg-timeline-label { font-size: 14px; font-weight: 600; }
+.tg-timeline-detail { font-size: 13px; color: var(--ink-soft); }
+.tg-timeline-date { font-size: 11px; color: var(--ink-soft); }
+
+/* ---------------- Audit list ---------------- */
+.tg-audit-list { display: flex; flex-direction: column; }
+.tg-audit-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--bg);
+}
+.tg-audit-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--ink-soft);
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.tg-audit-create     { background: var(--ok); }
+.tg-audit-update     { background: var(--warn); }
+.tg-audit-delete     { background: var(--danger); }
+.tg-audit-login      { background: var(--brand); }
+.tg-audit-csv_import { background: var(--accent); }
+
+/* ---------------- Responsive ---------------- */
+@media (max-width: 991.98px) {
+  :root { --sidebar-w: 68px; }
+  .tg-brand-name, .tg-brand-sub { display: none; }
+  .tg-sidebar-brand { justify-content: center; padding: 16px 8px; }
+  .tg-nav-link { justify-content: center; padding: 12px 8px; }
+  .tg-nav-link i { width: auto; font-size: 16px; }
+  .tg-nav-link { font-size: 0; gap: 0; }
+  .tg-nav-link i { font-size: 16px; }
+  .tg-topbar { padding: 0 14px; }
+  .tg-content { padding: calc(var(--topbar-h) + 16px) 14px 32px; }
+}
