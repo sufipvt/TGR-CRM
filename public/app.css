@@ -339,3 +339,15 @@ body {
   align-self: flex-start;
   letter-spacing: 2px;
 }
+@media (max-width: 767.98px) {
+  #tgChatWindow {
+    width: calc(100vw - 32px) !important;
+    height: 70vh !important;
+    right: 0;
+    bottom: 0;
+  }
+  #tgChatBubble {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+}
