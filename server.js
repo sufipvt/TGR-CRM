@@ -933,6 +933,163 @@ async function appHandler(req, res) {
 app.get('/app', requireAuth, appHandler);
 app.post('/app', requireAuth, appHandler);
 
+// ============ CHATBOT ROUTE ============
+app.post('/api/chat', requireAuth, async (req, res) => {
+  try {
+    const { message } = req.body;
+    const user = await User.findById(req.user.userId);
+    if (!message) return res.json({ reply: 'Please type a message.' });
+
+    // --- QUICK COMMANDS ---
+    const cmd = message.trim().toLowerCase();
+
+    if (cmd === '/leads' || cmd === 'my leads') {
+      const filter = isAdminOrMD(user)
+        ? {}
+        : { $or: [{ assigned_caller_id: user._id }, { assigned_closer_id: user._id }] };
+      const leads = await Lead.find(filter).sort('-created_at').limit(5)
+        .populate('project_id source_id');
+      if (!leads.length) return res.json({ reply: 'No leads found.' });
+      const list = leads.map(l =>
+        `• **${l.name}** — ${l.phone} — ${l.status} — ${l.project_id?.name || '—'}`
+      ).join('\n');
+      return res.json({ reply: `Your recent leads:\n${list}` });
+    }
+
+    if (cmd === '/overdue') {
+      const filter = isAdminOrMD(user)
+        ? { status: 'Pending', scheduled_date: { $lt: new Date() } }
+        : { assigned_to_id: user._id, status: 'Pending', scheduled_date: { $lt: new Date() } };
+      const fus = await FollowUp.find(filter).populate('lead_id').limit(5);
+      if (!fus.length) return res.json({ reply: '✅ No overdue follow-ups!' });
+      const list = fus.map(f =>
+        `• **${f.lead_id?.name || '—'}** — ${f.type} — Due: ${new Date(f.scheduled_date).toLocaleDateString('en-IN')}`
+      ).join('\n');
+      return res.json({ reply: `Overdue follow-ups:\n${list}` });
+    }
+
+    if (cmd === '/stats') {
+      const filter = isAdminOrMD(user)
+        ? {}
+        : { $or: [{ assigned_caller_id: user._id }, { assigned_closer_id: user._id }] };
+      const totalLeads  = await Lead.countDocuments(filter);
+      const todayStart  = new Date(); todayStart.setHours(0,0,0,0);
+      const newToday    = await Lead.countDocuments({ ...filter, created_at: { $gte: todayStart } });
+      const pendingFU   = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending' });
+      const overdueFU   = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending', scheduled_date: { $lt: new Date() } });
+      return res.json({ reply:
+        `📊 **Your Stats**\n` +
+        `• Total Leads: ${totalLeads}\n` +
+        `• New Today: ${newToday}\n` +
+        `• Pending Follow-Ups: ${pendingFU}\n` +
+        `• Overdue: ${overdueFU}`
+      });
+    }
+
+    if (cmd === '/bookings') {
+      const filter = isAdminOrMD(user) ? {} : { closer_id: user._id };
+      const bookings = await Booking.find(filter).sort('-booking_date').limit(5)
+        .populate('lead_id project_id');
+      if (!bookings.length) return res.json({ reply: 'No bookings found.' });
+      const list = bookings.map(b =>
+        `• **${b.lead_id?.name || '—'}** — ${b.project_id?.name || '—'} — ₹${Number(b.sale_value).toLocaleString('en-IN')}`
+      ).join('\n');
+      return res.json({ reply: `Recent bookings:\n${list}` });
+    }
+
+    if (cmd.startsWith('/search ')) {
+      const q = cmd.replace('/search ', '').trim();
+      const leads = await Lead.find({
+        name: { $regex: q, $options: 'i' }
+      }).limit(5).populate('project_id');
+      if (!leads.length) return res.json({ reply: `No leads found for "${q}".` });
+      const list = leads.map(l =>
+        `• **${l.name}** — ${l.phone} — ${l.status} — ${l.project_id?.name || '—'}`
+      ).join('\n');
+      return res.json({ reply: `Search results for "${q}":\n${list}` });
+    }
+
+    if (cmd === '/help') {
+      return res.json({ reply:
+        `**Available Commands:**\n` +
+        `/leads — your recent leads\n` +
+        `/overdue — overdue follow-ups\n` +
+        `/stats — your performance stats\n` +
+        `/bookings — recent bookings\n` +
+        `/search [name] — find a lead\n` +
+        `/help — show this list\n\n` +
+        `Or just ask anything in plain English!`
+      });
+    }
+
+    // --- AI (GROQ) for natural language ---
+    if (!process.env.GROQ_API_KEY) {
+      return res.json({ reply: 'AI not configured. Use /help for commands.' });
+    }
+
+    // Build context from live CRM data
+    const totalLeads     = await Lead.countDocuments();
+    const totalBookings  = await Booking.countDocuments();
+    const totalProjects  = await Project.countDocuments();
+    const pendingFUs     = await FollowUp.countDocuments({ status: 'Pending' });
+    const overdueFUs     = await FollowUp.countDocuments({ status: 'Pending', scheduled_date: { $lt: new Date() } });
+    const revenueAgg     = await Booking.aggregate([{ $group: { _id: null, total: { $sum: '$sale_value' } } }]);
+    const totalRevenue   = revenueAgg[0]?.total || 0;
+    const todayStart     = new Date(); todayStart.setHours(0,0,0,0);
+    const newToday       = await Lead.countDocuments({ created_at: { $gte: todayStart } });
+    const byStatus       = await Lead.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]);
+    const statusSummary  = byStatus.map(s => `${s._id}: ${s.count}`).join(', ');
+    const topSources     = await Lead.aggregate([
+      { $group: { _id: '$source_id', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }, { $limit: 3 },
+      { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'src' } }
+    ]);
+    const sourceSummary = topSources.map(s => `${s.src[0]?.name || '—'}: ${s.count}`).join(', ');
+
+    const systemPrompt = `You are TG Assistant, the AI helper for TrueGrowth CRM — a real estate sales CRM used in India.
+You only answer questions about CRM data. Be concise, helpful, and use Indian context (₹ for currency).
+Current CRM Data:
+- Total Leads: ${totalLeads} (${newToday} new today)
+- Lead Status Breakdown: ${statusSummary}
+- Total Bookings: ${totalBookings}
+- Total Revenue: ₹${totalRevenue.toLocaleString('en-IN')}
+- Pending Follow-Ups: ${pendingFUs} (${overdueFUs} overdue)
+- Total Projects: ${totalProjects}
+- Top Lead Sources: ${sourceSummary}
+- Logged in user: ${user.full_name} (${user.role})
+Answer only based on this data. If asked something outside CRM scope, politely decline.`;
+
+    const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: message }
+        ],
+        max_tokens: 300,
+        temperature: 0.3
+      })
+    });
+
+    const groqData = await groqRes.json();
+    const reply = groqData.choices?.[0]?.message?.content || 'Sorry, I could not process that.';
+    res.json({ reply });
+
+  } catch (err) {
+    console.error('Chat error:', err);
+    res.json({ reply: 'Something went wrong. Try again.' });
+  }
+});
+
+function isAdminOrMD(user) {
+  return ['Admin', 'MD'].includes(user.role);
+}
+
 // 404 catch-all
 app.use((req, res) => res.status(404).send('Route Not Found: ' + req.method + ' ' + req.url));
 

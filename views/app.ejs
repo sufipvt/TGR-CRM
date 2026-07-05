@@ -1200,5 +1200,67 @@
     link.addEventListener('click', closeSidebar);
   });
 </script>
+<!-- ========== CHAT BUBBLE ========== -->
+<div id="tgChatBubble" style="
+  position:fixed; bottom:24px; right:24px; z-index:2000;
+  display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
+
+  <!-- Chat Window -->
+  <div id="tgChatWindow" style="
+    display:none; width:340px; height:460px;
+    background:#fff; border-radius:16px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.18);
+    border:1px solid var(--border);
+    display:none; flex-direction:column; overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:var(--brand);padding:14px 16px;display:flex;align-items:center;gap:10px;">
+      <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;
+        display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;">
+        <i class="fa-solid fa-robot"></i>
+      </div>
+      <div>
+        <div style="color:#fff;font-weight:700;font-size:14px;">TG Assistant</div>
+        <div style="color:rgba(255,255,255,0.8);font-size:11px;">Ask me anything about your CRM</div>
+      </div>
+      <button onclick="tgToggleChat()" style="margin-left:auto;background:none;border:none;
+        color:#fff;font-size:18px;cursor:pointer;padding:4px;">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <!-- Messages -->
+    <div id="tgChatMessages" style="flex:1;overflow-y:auto;padding:14px;
+      display:flex;flex-direction:column;gap:10px;background:#f8fafc;">
+      <!-- Welcome message -->
+      <div class="tg-msg-bot">
+        👋 Hi <strong><%= user.full_name %></strong>! I'm your CRM assistant.<br>
+        Type <code>/help</code> to see commands or ask anything!
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div style="padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;background:#fff;">
+      <input type="text" id="tgChatInput" placeholder="Ask or type /help..."
+        style="flex:1;padding:8px 12px;border:1px solid var(--border);
+        border-radius:8px;font-size:13px;outline:none;"
+        onkeydown="if(event.key==='Enter') tgSendChat()">
+      <button onclick="tgSendChat()" style="background:var(--brand);color:#fff;
+        border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">
+        <i class="fa-solid fa-paper-plane"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Toggle Button -->
+  <button onclick="tgToggleChat()" id="tgChatBtn" style="
+    width:52px;height:52px;border-radius:50%;
+    background:var(--brand);color:#fff;border:none;
+    font-size:20px;cursor:pointer;
+    box-shadow:0 4px 16px rgba(26,86,219,0.4);
+    display:flex;align-items:center;justify-content:center;">
+    <i class="fa-solid fa-robot"></i>
+  </button>
+</div>
 </body>
 </html>

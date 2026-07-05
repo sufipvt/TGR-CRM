@@ -414,3 +414,59 @@ function tgEditUser(u) {
   if (title) title.textContent = 'Edit User';
   new bootstrap.Modal(document.getElementById('userModal')).show();
 }
+// ============ CHATBOT ============
+let tgChatOpen = false;
+
+function tgToggleChat() {
+  tgChatOpen = !tgChatOpen;
+  const win = document.getElementById('tgChatWindow');
+  const btn = document.getElementById('tgChatBtn');
+  win.style.display = tgChatOpen ? 'flex' : 'none';
+  btn.innerHTML = tgChatOpen
+    ? '<i class="fa-solid fa-xmark"></i>'
+    : '<i class="fa-solid fa-robot"></i>';
+  if (tgChatOpen) document.getElementById('tgChatInput').focus();
+}
+
+function tgAppendMsg(text, type) {
+  const box = document.getElementById('tgChatMessages');
+  const div = document.createElement('div');
+  div.className = type === 'user' ? 'tg-msg-user' : 'tg-msg-bot';
+  // Convert **bold** markdown and newlines
+  div.innerHTML = text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\n/g, '<br>');
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  return div;
+}
+
+async function tgSendChat() {
+  const input = document.getElementById('tgChatInput');
+  const message = input.value.trim();
+  if (!message) return;
+  input.value = '';
+
+  tgAppendMsg(message, 'user');
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'tg-msg-typing';
+  typing.textContent = '•••';
+  document.getElementById('tgChatMessages').appendChild(typing);
+  document.getElementById('tgChatMessages').scrollTop = 999999;
+
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message })
+    });
+    const data = await res.json();
+    typing.remove();
+    tgAppendMsg(data.reply || 'No response.', 'bot');
+  } catch (e) {
+    typing.remove();
+    tgAppendMsg('Connection error. Try again.', 'bot');
+  }
+}
