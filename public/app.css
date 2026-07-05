@@ -265,10 +265,47 @@ body {
   :root { --sidebar-w: 68px; }
   .tg-brand-name, .tg-brand-sub { display: none; }
   .tg-sidebar-brand { justify-content: center; padding: 16px 8px; }
-  .tg-nav-link { justify-content: center; padding: 12px 8px; }
-  .tg-nav-link i { width: auto; font-size: 16px; }
-  .tg-nav-link { font-size: 0; gap: 0; }
-  .tg-nav-link i { font-size: 16px; }
+  .tg-nav-link { justify-content: center; padding: 12px 8px; font-size: 0; gap: 0; }
+  .tg-nav-link i { font-size: 16px; width: auto; }
   .tg-topbar { padding: 0 14px; }
   .tg-content { padding: calc(var(--topbar-h) + 16px) 14px 32px; }
+}
+
+@media (max-width: 767.98px) {
+  :root { --sidebar-w: 0px; }
+  .tg-sidebar {
+    width: 260px;
+    transform: translateX(-260px);
+    transition: transform 0.25s ease;
+  }
+  .tg-sidebar.open { transform: translateX(0); }
+  .tg-topbar { left: 0; }
+  .tg-content { margin-left: 0; padding: calc(var(--topbar-h) + 16px) 14px 32px; }
+  .tg-hamburger { display: flex !important; }
+  .tg-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1029;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  .tg-sidebar-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.tg-hamburger {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 20px;
+  padding: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
 }

@@ -56,6 +56,9 @@
 
 <!-- TOPBAR -->
 <header class="tg-topbar">
+  <button class="tg-hamburger" id="tgHamburger" aria-label="Open menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
   <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
   <div class="tg-profile">
     <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
@@ -1172,5 +1175,30 @@
   </div>
 </div>
 </main>
+<div class="tg-sidebar-backdrop" id="tgBackdrop"></div>
+<script>
+  const tgHamburger = document.getElementById('tgHamburger');
+  const tgSidebar   = document.querySelector('.tg-sidebar');
+  const tgBackdrop  = document.getElementById('tgBackdrop');
+
+  function openSidebar() {
+    tgSidebar.classList.add('open');
+    tgBackdrop.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    tgSidebar.classList.remove('open');
+    tgBackdrop.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+
+  tgHamburger?.addEventListener('click', openSidebar);
+  tgBackdrop?.addEventListener('click', closeSidebar);
+
+  // Close sidebar when a nav link is tapped on mobile
+  document.querySelectorAll('.tg-nav-link').forEach(link => {
+    link.addEventListener('click', closeSidebar);
+  });
+</script>
 </body>
 </html>
