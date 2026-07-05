@@ -78,6 +78,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', filterBookings);
   });
+
+  const confirmCompleteBtn = document.getElementById('confirmCompleteBtn');
+  if (confirmCompleteBtn) {
+    confirmCompleteBtn.addEventListener('click', () => {
+      const outcome = document.getElementById('completeOutcomeInput').value;
+      setVal('completeFuId', _completeFuId);
+      setVal('completeFuOutcome', outcome);
+      bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
+      document.getElementById('completeFuForm').submit();
+    });
+  }
 });
 
 /* ============================ LEADS PAGE ============================ */
@@ -207,12 +218,12 @@ function tgEditFollowup(f) {
   new bootstrap.Modal(document.getElementById('followupModal')).show();
 }
 
+let _completeFuId = null;
+
 function tgCompleteFollowup(id) {
-  const outcome = prompt('Outcome of this follow-up? (optional)');
-  if (outcome === null) return;
-  setVal('completeFuId', id);
-  setVal('completeFuOutcome', outcome);
-  document.getElementById('completeFuForm').submit();
+  _completeFuId = id;
+  document.getElementById('completeOutcomeInput').value = '';
+  new bootstrap.Modal(document.getElementById('completeModal')).show();
 }
 
 /* ============================ BOOKINGS PAGE ============================ */

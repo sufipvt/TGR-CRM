@@ -241,7 +241,7 @@
                   <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
                      href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
                      title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
-                  <button class="btn btn-sm btn-outline-secondary" onclick="tgShowTimeline('<%= lead._id %>', '<%= lead.name.replace(/'/g, '') %>')" title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="tgShowTimeline('<%= lead._id %>', <%- JSON.stringify(lead.name) %>)" title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
                   <% if (canEdit) { %>
                     <form method="POST" action="/app?page=leads" style="display:inline">
                       <input type="hidden" name="action" value="quick_disposition">
@@ -1149,6 +1149,28 @@
       </div>
     </div>
   <% } %>
+  <!-- Complete Follow-Up Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Mark Complete</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label fw-medium">Outcome <span class="text-secondary">(optional)</span></label>
+        <textarea class="form-control" id="completeOutcomeInput" rows="2"
+          placeholder="e.g. Interested, will visit Saturday"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn btn-success" id="confirmCompleteBtn">
+          <i class="fa-solid fa-check me-1"></i>Mark Done
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 </main>
 </body>
 </html>

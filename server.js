@@ -1,7 +1,12 @@
 // TrueGrowth CRM — server.js
 // Node.js + Express + MongoDB (Mongoose) + EJS + SendGrid + node-cron
-require('dotenv').config();
-require('dotenv').config({ path: '.env.development.local' });
+//-------------------------------------------------------------------------
+//require('dotenv').config();
+//require('dotenv').config({ path: '.env.development.local' });
+//-------------------------------------------------------------------------
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config({ path: '.env.development.local' });
+}
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -510,7 +515,12 @@ async function handlePostAction(req) {
       }
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
       const update = { status: body.status };
-      if (body.status === 'Qualified') update.qualified_at = new Date();
+      //if (body.status === 'Qualified') update.qualified_at = new Date();
+      const existing = await Lead.findById(body.lead_id).select('qualified_at');
+      if (body.status === 'Qualified' && !existing?.qualified_at) {
+        update.qualified_at = new Date();
+      }
+
       await Lead.findByIdAndUpdate(body.lead_id, update);
       await audit(user.email, 'update', 'Lead', body.lead_id, { quick_disposition: body.status });
       return 'Lead marked ' + body.status + '.';
@@ -751,7 +761,11 @@ async function handleDelete(req) {
       if (!manager && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
       await Payment.deleteMany({ booking_id: id });
       await Unit.findByIdAndUpdate(b.unit_id, { status: 'Available' });
-      await Lead.findByIdAndUpdate(b.lead_id, { status: 'Negotiation', booked_at: null });
+      //await Lead.findByIdAndUpdate(b.lead_id, { status: 'Negotiation', booked_at: null });
+      const lead = await Lead.findById(b.lead_id).select('assigned_closer_id');
+      const restoreStatus = lead?.assigned_closer_id ? 'Negotiation' : 'Qualified';
+      await Lead.findByIdAndUpdate(b.lead_id, { status: restoreStatus, booked_at: null });
+      //------------------------------------------------------------------------------
       await Booking.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'Booking', id, {});
       break;
@@ -874,6 +888,7 @@ async function appHandler(req, res) {
       data.report_from = from.toISOString().slice(0, 10);
       data.report_to = to.toISOString().slice(0, 10);
       const rangeFilter = { created_at: { $gte: from, $lte: to } };
+      const bookingRangeFilter = { booking_date: { $gte: from, $lte: to } };
       const totalLeads = await Lead.countDocuments(rangeFilter);
       const qualified = await Lead.countDocuments({ ...rangeFilter, qualified_at: { $ne: null } });
       const booked = await Lead.countDocuments({ ...rangeFilter, status: 'Booked' });
@@ -895,7 +910,7 @@ async function appHandler(req, res) {
       for (const u of users) {
         const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
         const qualCount = await Lead.countDocuments({ assigned_caller_id: u._id, qualified_at: { $ne: null } });
-        const bookings = await Booking.aggregate([{ $match: { closer_id: u._id } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
+        const bookings = await Booking.aggregate([{ $match: { closer_id: u._id, ...bookingRangeFilter } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
         const fuCount = await FollowUp.countDocuments({ assigned_to_id: u._id });
         data.performance_report.push({
           name: u.full_name, role: u.role, leads: leadCount, qualified: qualCount,
