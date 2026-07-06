@@ -218,7 +218,7 @@ function tgEditFollowup(f) {
   new bootstrap.Modal(document.getElementById('followupModal')).show();
 }
 
-let _completeFuId = null;
+
 
 function tgCompleteFollowup(id) {
   _completeFuId = id;
@@ -415,7 +415,9 @@ function tgEditUser(u) {
   new bootstrap.Modal(document.getElementById('userModal')).show();
 }
 // ============ CHATBOT ============
+// ============ CHATBOT ============
 let tgChatOpen = false;
+let _completeFuId = null;
 
 function tgToggleChat() {
   tgChatOpen = !tgChatOpen;
@@ -425,19 +427,33 @@ function tgToggleChat() {
   btn.innerHTML = tgChatOpen
     ? '<i class="fa-solid fa-xmark"></i>'
     : '<i class="fa-solid fa-robot"></i>';
-  if (tgChatOpen) document.getElementById('tgChatInput').focus();
+  if (tgChatOpen) {
+    document.getElementById('tgChatInput').focus();
+    sessionStorage.setItem('tgChatOpen', '1');
+  } else {
+    sessionStorage.removeItem('tgChatOpen');
+  }
 }
 
-function tgAppendMsg(text, type) {
+function tgAppendMsg(text, type, persist) {
   const box = document.getElementById('tgChatMessages');
   const div = document.createElement('div');
   div.className = type === 'user' ? 'tg-msg-user' : 'tg-msg-bot';
-  // Convert **bold** markdown and newlines
   div.innerHTML = text
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
   box.appendChild(div);
   box.scrollTop = box.scrollHeight;
+
+  // Save to sessionStorage so messages survive page navigation
+  if (persist !== false) {
+    try {
+      const history = JSON.parse(sessionStorage.getItem('tgHistory') || '[]');
+      history.push({ text, type });
+      if (history.length > 30) history.splice(0, history.length - 30);
+      sessionStorage.setItem('tgHistory', JSON.stringify(history));
+    } catch(e) {}
+  }
   return div;
 }
 
@@ -449,12 +465,12 @@ async function tgSendChat() {
 
   tgAppendMsg(message, 'user');
 
-  // Typing indicator
+  const box = document.getElementById('tgChatMessages');
   const typing = document.createElement('div');
   typing.className = 'tg-msg-typing';
   typing.textContent = '•••';
-  document.getElementById('tgChatMessages').appendChild(typing);
-  document.getElementById('tgChatMessages').scrollTop = 999999;
+  box.appendChild(typing);
+  box.scrollTop = 999999;
 
   try {
     const res = await fetch('/api/chat', {
@@ -470,3 +486,40 @@ async function tgSendChat() {
     tgAppendMsg('Connection error. Try again.', 'bot');
   }
 }
+
+// Restore chat state after page navigation
+document.addEventListener('DOMContentLoaded', () => {
+  // Restore open/closed state
+  if (sessionStorage.getItem('tgChatOpen') === '1') {
+    const win = document.getElementById('tgChatWindow');
+    const btn = document.getElementById('tgChatBtn');
+    if (win && btn) {
+      tgChatOpen = true;
+      win.style.display = 'flex';
+      btn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    }
+  }
+
+  // Restore message history
+  try {
+    const history = JSON.parse(sessionStorage.getItem('tgHistory') || '[]');
+    // Clear the default welcome message if we have history
+    if (history.length > 0) {
+      const box = document.getElementById('tgChatMessages');
+      if (box) box.innerHTML = '';
+    }
+    history.forEach(msg => tgAppendMsg(msg.text, msg.type, false));
+  } catch(e) {}
+
+  // Complete follow-up modal confirm button
+  const confirmCompleteBtn = document.getElementById('confirmCompleteBtn');
+  if (confirmCompleteBtn) {
+    confirmCompleteBtn.addEventListener('click', () => {
+      const outcome = document.getElementById('completeOutcomeInput').value;
+      setVal('completeFuId', _completeFuId);
+      setVal('completeFuOutcome', outcome);
+      bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
+      document.getElementById('completeFuForm').submit();
+    });
+  }
+});

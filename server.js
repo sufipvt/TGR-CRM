@@ -1031,6 +1031,13 @@ app.post('/api/chat', requireAuth, async (req, res) => {
     const totalLeads     = await Lead.countDocuments();
     const totalBookings  = await Booking.countDocuments();
     const totalProjects  = await Project.countDocuments();
+    const projectsList   = await Project.find()
+    .select('name status city price_range total_units available_units project_type notes')
+    .lean();
+    const projectSummary = projectsList.map(p =>
+       `  - ${p.name} | Type: ${p.project_type || '—'} | City: ${p.city || '—'} | Status: ${p.status} | Price: ${p.price_range || '—'} | Units: ${p.available_units}/${p.total_units} available | Notes: ${p.notes || '—'}`
+       ).join('\n');
+
     const pendingFUs     = await FollowUp.countDocuments({ status: 'Pending' });
     const overdueFUs     = await FollowUp.countDocuments({ status: 'Pending', scheduled_date: { $lt: new Date() } });
     const revenueAgg     = await Booking.aggregate([{ $group: { _id: null, total: { $sum: '$sale_value' } } }]);
@@ -1055,6 +1062,7 @@ Current CRM Data:
 - Total Revenue: ₹${totalRevenue.toLocaleString('en-IN')}
 - Pending Follow-Ups: ${pendingFUs} (${overdueFUs} overdue)
 - Total Projects: ${totalProjects}
+- Project Details: ${projectSummary}
 - Top Lead Sources: ${sourceSummary}
 - Logged in user: ${user.full_name} (${user.role})
 Answer only based on this data. If asked something outside CRM scope, politely decline.`;
