@@ -473,10 +473,12 @@ async function tgSendChat() {
   box.scrollTop = 999999;
 
   try {
+    let history = [];
+    try { history = JSON.parse(sessionStorage.getItem('tgHistory') || '[]').slice(-10); } catch(e) {}
     const res = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message })
+      body: JSON.stringify({ message, history })
     });
     const data = await res.json();
     typing.remove();
