@@ -435,45 +435,107 @@ app.post('/app/import-leads', requireAuth, requireAdmin, (req, res) => {
     if (err) return res.redirect('/app?page=leads&msg=' + encodeURIComponent('Upload failed: ' + err.message));
     if (!req.file) return res.redirect('/app?page=leads&msg=' + encodeURIComponent('No file uploaded.'));
     try {
-      const records = parseCsvSync(req.file.buffer, { columns: h => h.map(c => c.trim().toLowerCase()), skip_empty_lines: true, trim: true });
+      // Accept optional column mapping from the smart mapper UI
+      let mapping = null;
+      if (req.body.column_mapping) {
+        try { mapping = JSON.parse(req.body.column_mapping); } catch(e) {}
+      }
+
+      // If mapping provided → keep original header casing; else → lowercase (standard template)
+      const records = parseCsvSync(req.file.buffer, {
+        columns: mapping
+          ? h => h.map(c => c.trim())
+          : h => h.map(c => c.trim().toLowerCase()),
+        skip_empty_lines: true,
+        trim: true
+      });
+
+      // Read a field using mapping or standard column name
+      function getField(row, field) {
+        if (mapping && mapping[field]) return (row[mapping[field]] || '').trim();
+        return (row[field] || '').trim();
+      }
+
       const results = { success: 0, failed: 0, errors: [] };
 
       for (const row of records) {
         try {
-          if (!row.name || !row.phone) { results.failed++; results.errors.push('Row missing name/phone'); continue; }
-          const source = row.source_name
-            ? await LeadSource.findOne({ name: new RegExp('^' + escapeRegex(row.source_name) + '$', 'i') })
-            : null;
-          if (!source) { results.failed++; results.errors.push('Row ' + row.name + ': source not found'); continue; }
+          const name  = getField(row, 'name');
+          const phone = getField(row, 'phone');
+          if (!name || !phone) {
+            results.failed++;
+            results.errors.push('Row missing name/phone');
+            continue;
+          }
 
-          const project = row.project_name
-            ? await Project.findOne({ name: new RegExp('^' + escapeRegex(row.project_name) + '$', 'i') })
+          // Find or auto-create lead source
+          const source_name = getField(row, 'source_name');
+          let source = source_name
+            ? await LeadSource.findOne({ name: new RegExp('^' + escapeRegex(source_name) + '$', 'i') })
+            : null;
+
+          // Auto-create source if it doesn't exist
+          if (!source && source_name) {
+            source = await LeadSource.create({
+              name: source_name.trim(),
+              channel: 'Online',
+              active: true,
+              notes: 'Auto-created during CSV import'
+            });
+            await audit(req.user.email, 'create', 'LeadSource', source._id, {
+              name: source_name, auto_created: true
+            });
+          }
+
+          // Fallback — no source column, use first active source
+          if (!source) {
+            source = await LeadSource.findOne({ active: true }).sort('name');
+          }
+
+          // Last resort — create generic source
+          if (!source) {
+            source = await LeadSource.create({
+              name: 'Imported',
+              channel: 'Online',
+              active: true,
+              notes: 'Auto-created as fallback during CSV import'
+            });
+          }
+
+          // Find project if provided
+          const project_name = getField(row, 'project_name');
+          const project = project_name
+            ? await Project.findOne({ name: new RegExp('^' + escapeRegex(project_name) + '$', 'i') })
             : null;
 
           const caller_id = await getNextCaller();
 
           const lead = await Lead.create({
-            name: row.name,
-            phone: row.phone,
-            email: row.email || '',
-            city: row.city || '',
-            source_id: source._id,
-            project_id: project ? project._id : null,
-            budget_range: row.budget_range || '',
-            notes: row.notes || 'Imported via CSV',
+            name,
+            phone,
+            email:        getField(row, 'email'),
+            city:         getField(row, 'city'),
+            source_id:    source._id,
+            project_id:   project ? project._id : null,
+            budget_range: getField(row, 'budget_range'),
+            notes:        getField(row, 'notes') || 'Imported via CSV',
             assigned_caller_id: caller_id,
             status: 'New',
             created_at: new Date()
           });
 
-          await audit(req.user.email, 'csv_import', 'Lead', lead._id, { name: row.name });
+          await audit(req.user.email, 'csv_import', 'Lead', lead._id, { name });
           results.success++;
         } catch (e) {
           results.failed++;
-          results.errors.push('Row ' + (row.name || '?') + ': ' + e.message);
+          results.errors.push((getField(row, 'name') || '?') + ': ' + e.message);
         }
       }
-      res.redirect('/app?page=leads&msg=' + encodeURIComponent('Imported ' + results.success + ' leads. ' + results.failed + ' failed.'));
+
+      res.redirect('/app?page=leads&msg=' + encodeURIComponent(
+        'Imported ' + results.success + ' leads. ' +
+        (results.failed ? results.failed + ' failed.' : 'All successful! ✓')
+      ));
     } catch (e) {
       console.error('CSV import error:', e);
       res.redirect('/app?page=leads&msg=' + encodeURIComponent('CSV parse failed: ' + e.message));

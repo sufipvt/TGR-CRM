@@ -427,6 +427,233 @@ function tgEditUser(u) {
   if (title) title.textContent = 'Edit User';
   new bootstrap.Modal(document.getElementById('userModal')).show();
 }
+/* ===== SMART CSV COLUMN MAPPER ===== */
+
+const TG_FIELD_ALIASES = {
+  name:         ['name','fullname','full_name','leadname','lead_name','customername',
+                 'customer_name','contactname','contact_name','clientname','client_name',
+                 'full name','lead name','customer name','contact name','applicant name',
+                 'prospect','sendername','sender name'],
+  phone:        ['phone','mobile','phonenumber','phone_number','mobilenumber','mobile_number',
+                 'contact','cell','whatsapp','contactno','mobileno','phone no','mobile no',
+                 'phone number','mobile number','contact no','contact number',
+                 'whatsapp number','ph','mob'],
+  email:        ['email','emailid','email_id','emailaddress','email_address','mail',
+                 'email id','email address','e-mail','e mail'],
+  city:         ['city','location','town','area','district','region','locality',
+                 'place','city name'],
+  source_name:  ['source','sourcename','source_name','leadsource','lead_source',
+                 'channel','medium','campaign','source name','lead source',
+                 'origin','portal','platform'],
+  project_name: ['project','projectname','project_name','property','propertyname',
+                 'property_name','development','scheme','project name','property name',
+                 'building','tower','society','development name'],
+  budget_range: ['budget','budgetrange','budget_range','price','pricerange','price_range',
+                 'requirement','investment','budget range','price range',
+                 'expected budget','investment range','property budget'],
+  notes:        ['notes','note','comments','comment','remarks','remark',
+                 'description','details','info','message','additional info',
+                 'other details','requirement details','query']
+};
+
+const TG_FIELD_LABELS = {
+  name:         { label: 'Name',         required: true  },
+  phone:        { label: 'Phone',        required: true  },
+  email:        { label: 'Email',        required: false },
+  city:         { label: 'City',         required: false },
+  source_name:  { label: 'Lead Source',  required: false },
+  project_name: { label: 'Project',      required: false },
+  budget_range: { label: 'Budget Range', required: false },
+  notes:        { label: 'Notes',        required: false }
+};
+
+let _csvHeaders = [];
+let _csvRows    = [];
+let _csvFile    = null;
+
+function tgParseCsvLine(line) {
+  const result = [];
+  let current  = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim().replace(/^"|"$/g, ''));
+  return result;
+}
+
+function tgParseCsvPreview(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const lines    = e.target.result.split('\n').map(l => l.replace(/\r/g, '')).filter(l => l.trim());
+        if (!lines.length) return reject(new Error('File is empty'));
+        const headers  = tgParseCsvLine(lines[0]);
+        const rows     = lines.slice(1, 4).map(l => {
+          const vals = tgParseCsvLine(l);
+          const row  = {};
+          headers.forEach((h, i) => { row[h] = vals[i] || ''; });
+          return row;
+        });
+        resolve({ headers, rows });
+      } catch(err) { reject(err); }
+    };
+    reader.onerror = () => reject(new Error('Could not read file'));
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+function tgAutoDetect(headers) {
+  const mapping = {};
+  headers.forEach(header => {
+    const norm = header.toLowerCase().replace(/[\s\-_.]/g, '');
+    for (const [field, aliases] of Object.entries(TG_FIELD_ALIASES)) {
+      if (!mapping[field]) {
+        if (aliases.some(a => a.replace(/[\s\-_.]/g, '') === norm)) {
+          mapping[field] = header;
+        }
+      }
+    }
+  });
+  return mapping;
+}
+
+async function tgShowColumnMapper() {
+  const fileInput = document.getElementById('importFileInput');
+  if (!fileInput || !fileInput.files.length) {
+    alert('Please select a CSV file first.');
+    return;
+  }
+  _csvFile = fileInput.files[0];
+  try {
+    const { headers, rows } = await tgParseCsvPreview(_csvFile);
+    _csvHeaders = headers;
+    _csvRows    = rows;
+
+    const detected  = tgAutoDetect(headers);
+    const tbody     = document.getElementById('importMapperBody');
+    tbody.innerHTML = '';
+
+    const skipOpt = '<option value="">(Skip this field)</option>';
+    const colOpts = headers.map(h =>
+      `<option value="${h.replace(/"/g,'&quot;')}">${h}</option>`
+    ).join('');
+
+    for (const [field, meta] of Object.entries(TG_FIELD_LABELS)) {
+      const detectedCol = detected[field] || '';
+      const preview     = detectedCol && rows.length ? (rows[0][detectedCol] || '') : '';
+      const requiredBadge = meta.required
+        ? '<span class="badge text-bg-danger ms-1" style="font-size:10px;">Required</span>'
+        : '<span class="text-secondary" style="font-size:11px;"> optional</span>';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <span class="fw-medium" style="font-size:13px;">${meta.label}</span>
+          ${requiredBadge}
+        </td>
+        <td>
+          <select class="form-select form-select-sm" id="map_${field}" data-field="${field}">
+            ${skipOpt}${colOpts}
+          </select>
+        </td>
+        <td style="font-size:12px; color:#6b7280; max-width:160px;
+                   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
+            id="preview_${field}" title="${preview}">
+          ${preview || '<span class="text-muted">—</span>'}
+        </td>
+      `;
+      tbody.appendChild(tr);
+
+      const sel = document.getElementById('map_' + field);
+      if (detectedCol) sel.value = detectedCol;
+
+      sel.addEventListener('change', () => {
+        const col  = sel.value;
+        const prev = document.getElementById('preview_' + field);
+        const val  = col && rows.length ? (rows[0][col] || '') : '';
+        prev.textContent = val || '—';
+        prev.title = val;
+      });
+    }
+
+    // Auto-detect summary
+    const detected_count = Object.values(detected).filter(Boolean).length;
+    document.getElementById('importFileLabel').textContent =
+      _csvFile.name + ' · ' + headers.length + ' columns · ' +
+      detected_count + '/' + Object.keys(TG_FIELD_LABELS).length + ' auto-detected';
+
+    document.getElementById('importStep1').style.display = 'none';
+    document.getElementById('importStep2').style.display = '';
+  } catch(err) {
+    alert('Could not read CSV: ' + err.message + '\n\nPlease make sure it is a valid CSV file.');
+  }
+}
+
+function tgBackToStep1() {
+  document.getElementById('importStep2').style.display = 'none';
+  document.getElementById('importStep1').style.display = '';
+}
+
+function tgPrepareImport() {
+  const mapping = {};
+  let valid     = true;
+
+  for (const [field, meta] of Object.entries(TG_FIELD_LABELS)) {
+    const sel = document.getElementById('map_' + field);
+    if (!sel) continue;
+    if (sel.value) {
+      mapping[field] = sel.value;
+      sel.classList.remove('is-invalid');
+    } else if (meta.required) {
+      sel.classList.add('is-invalid');
+      valid = false;
+    }
+  }
+
+  if (!valid) {
+    alert('Name and Phone columns are required. Please map them before importing.');
+    return false;
+  }
+
+  document.getElementById('importMappingJson').value = JSON.stringify(mapping);
+
+  // Transfer the file object to the hidden file input
+  try {
+    const dt = new DataTransfer();
+    dt.items.add(_csvFile);
+    document.getElementById('importHiddenFile').files = dt.files;
+  } catch(e) {
+    console.warn('DataTransfer not supported in this browser:', e.message);
+  }
+
+  return true;
+}
+
+// Reset modal fully when closed
+document.addEventListener('DOMContentLoaded', () => {
+  const importModal = document.getElementById('importCsvModal');
+  if (importModal) {
+    importModal.addEventListener('hidden.bs.modal', () => {
+      document.getElementById('importStep1').style.display = '';
+      document.getElementById('importStep2').style.display = 'none';
+      const fi = document.getElementById('importFileInput');
+      if (fi) fi.value = '';
+      _csvFile = null;
+      _csvHeaders = [];
+      _csvRows = [];
+    });
+  }
+});
 
 /* ===== KANBAN ===== */
 let _dragCard = null;
