@@ -351,3 +351,68 @@ body {
     bottom: 16px !important;
   }
 }
+
+/* ===== KANBAN ===== */
+.tg-kanban-col {
+  width: 210px;
+  min-width: 210px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.tg-kanban-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100px;
+  border-radius: 10px;
+  padding: 4px 2px;
+  transition: background 0.15s, outline 0.15s;
+}
+
+.tg-kanban-cards.drag-over {
+  background: rgba(26, 86, 219, 0.07);
+  outline: 2px dashed var(--brand);
+}
+
+.tg-kanban-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.1s;
+  user-select: none;
+  position: relative;
+}
+
+.tg-kanban-card[draggable="false"] {
+  cursor: default;
+}
+
+.tg-kanban-card[draggable="true"]:hover {
+  box-shadow: 0 4px 14px rgba(0,0,0,0.10);
+  transform: translateY(-1px);
+}
+
+.tg-kanban-card.dragging {
+  opacity: 0.4;
+  cursor: grabbing;
+  transform: rotate(1.5deg);
+}
+
+.tg-kanban-stale {
+  border-left: 3px solid #f59e0b;
+}
+
+.tg-kanban-card-actions {
+  display: none;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.tg-kanban-card:hover .tg-kanban-card-actions {
+  display: flex;
+}

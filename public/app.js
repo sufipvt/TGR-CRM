@@ -93,17 +93,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ============================ LEADS PAGE ============================ */
 function filterLeads() {
-  const q = (document.getElementById('leadSearch')?.value || '').toLowerCase();
-  const st = document.getElementById('leadStatusFilter')?.value || '';
-  const src = document.getElementById('leadSourceFilter')?.value || '';
-  const prj = document.getElementById('leadProjectFilter')?.value || '';
+  const q   = (document.getElementById('leadSearch')?.value    || '').toLowerCase();
+  const st  =  document.getElementById('leadStatusFilter')?.value  || '';
+  const src =  document.getElementById('leadSourceFilter')?.value  || '';
+  const prj =  document.getElementById('leadProjectFilter')?.value || '';
+
+  // Table rows
   document.querySelectorAll('#leadsTable tbody tr[data-search]').forEach(tr => {
-    const okQ = !q || tr.dataset.search.includes(q);
-    const okS = !st || tr.dataset.status === st;
-    const okSrc = !src || tr.dataset.source === src;
-    const okP = !prj || tr.dataset.project === prj;
-    tr.style.display = (okQ && okS && okSrc && okP) ? '' : 'none';
+    const ok = (!q   || tr.dataset.search.includes(q))  &&
+               (!st  || tr.dataset.status  === st)       &&
+               (!src || tr.dataset.source  === src)      &&
+               (!prj || tr.dataset.project === prj);
+    tr.style.display = ok ? '' : 'none';
   });
+
+  // Kanban cards
+  document.querySelectorAll('.tg-kanban-card').forEach(card => {
+    const ok = (!q   || card.dataset.search.includes(q))  &&
+               (!st  || card.dataset.status  === st)       &&
+               (!src || card.dataset.source  === src)      &&
+               (!prj || card.dataset.project === prj);
+    card.style.display = ok ? '' : 'none';
+  });
+
+  tgUpdateKanbanCounts();
 }
 
 function tgResetLeadForm() {
@@ -414,6 +427,77 @@ function tgEditUser(u) {
   if (title) title.textContent = 'Edit User';
   new bootstrap.Modal(document.getElementById('userModal')).show();
 }
+
+/* ===== KANBAN ===== */
+let _dragCard = null;
+
+function tgSetView(view) {
+  const tableView  = document.getElementById('tgTableView');
+  const kanbanView = document.getElementById('tgKanbanView');
+  const tableBtn   = document.getElementById('tgViewTable');
+  const kanbanBtn  = document.getElementById('tgViewKanban');
+  if (!tableView || !kanbanView) return;
+
+  if (view === 'kanban') {
+    tableView.style.display  = 'none';
+    kanbanView.style.display = '';
+    tableBtn.className  = 'btn btn-sm btn-outline-secondary';
+    kanbanBtn.className = 'btn btn-sm btn-primary';
+  } else {
+    tableView.style.display  = '';
+    kanbanView.style.display = 'none';
+    tableBtn.className  = 'btn btn-sm btn-primary';
+    kanbanBtn.className = 'btn btn-sm btn-outline-secondary';
+  }
+  try { localStorage.setItem('tgLeadView', view); } catch(e) {}
+}
+
+function tgKanbanDragStart(event) {
+  _dragCard = event.currentTarget;
+  _dragCard.classList.add('dragging');
+  event.dataTransfer.effectAllowed = 'move';
+}
+
+function tgKanbanDrop(event, colEl, newStatus) {
+  event.preventDefault();
+  colEl.classList.remove('drag-over');
+  if (!_dragCard) return;
+
+  const leadId    = _dragCard.dataset.id;
+  const oldStatus = _dragCard.dataset.status;
+  if (oldStatus === newStatus) {
+    _dragCard.classList.remove('dragging');
+    _dragCard = null;
+    return;
+  }
+
+  // Optimistic UI — move card instantly, sync to server in background
+  _dragCard.dataset.status = newStatus;
+  colEl.appendChild(_dragCard);
+  _dragCard.classList.remove('dragging');
+  tgUpdateKanbanCounts();
+  _dragCard = null;
+
+  fetch(`/api/lead/${leadId}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  }).then(r => r.json()).then(d => {
+    if (!d.ok) location.reload();
+  }).catch(() => location.reload());
+}
+
+function tgUpdateKanbanCounts() {
+  document.querySelectorAll('.tg-kanban-col').forEach(col => {
+    const id    = 'kcount_' + col.dataset.status.replace(/ /g, '_');
+    const badge = document.getElementById(id);
+    if (badge) {
+      badge.textContent = col.querySelectorAll(
+        '.tg-kanban-card:not([style*="display: none"])'
+      ).length;
+    }
+  });
+}
 // ============ CHATBOT ============
 // ============ CHATBOT ============
 let tgChatOpen = false;
@@ -491,6 +575,11 @@ async function tgSendChat() {
 
 // Restore chat state after page navigation
 document.addEventListener('DOMContentLoaded', () => {
+  // Restore kanban/table preference
+  try {
+    if (localStorage.getItem('tgLeadView') === 'kanban') tgSetView('kanban');
+  } catch(e) {}
+
   // Restore open/closed state
   if (sessionStorage.getItem('tgChatOpen') === '1') {
     const win = document.getElementById('tgChatWindow');

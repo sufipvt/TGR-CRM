@@ -329,6 +329,26 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
+app.patch('/api/lead/:id/status', requireAuth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!LEAD_STATUSES.includes(status))
+      return res.status(400).json({ error: 'Invalid status' });
+    if (!(await canEditLead(req.user, req.params.id)))
+      return res.status(403).json({ error: 'Forbidden' });
+    const update = { status };
+    const existing = await Lead.findById(req.params.id).select('qualified_at booked_at');
+    if (status === 'Qualified' && !existing?.qualified_at) update.qualified_at = new Date();
+    if (status === 'Booked'    && !existing?.booked_at)    update.booked_at    = new Date();
+    await Lead.findByIdAndUpdate(req.params.id, update);
+    await audit(req.user.email, 'update', 'Lead', req.params.id, { status });
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('Status update error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // API ROUTES
 // ---------------------------------------------------------------------------
