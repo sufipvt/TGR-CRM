@@ -9,14 +9,49 @@ function setVal(id, val) {
   const el = document.getElementById(id);
   if (el) el.value = val == null ? '' : val;
 }
+/* ============================ THEME TOGGLE ============================ */
+function tgApplyThemeIcon() {
+  const theme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+  const icon = document.getElementById('tgThemeIcon');
+  if (icon) icon.className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+
+function tgToggleTheme() {
+  const html = document.documentElement;
+  const current = html.getAttribute('data-bs-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-bs-theme', next);
+  try { localStorage.setItem('tgTheme', next); } catch(e) {}
+  tgApplyThemeIcon();
+  tgRenderCharts();
+}
+
+document.addEventListener('DOMContentLoaded', tgApplyThemeIcon);
+
 
 /* ============================ DASHBOARD CHARTS ============================ */
-document.addEventListener('DOMContentLoaded', () => {
+let _tgTrendChart = null;
+let _tgStatusChart = null;
+
+function tgChartColors() {
+  const dark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+  return {
+    tick:           dark ? '#94a3b8' : '#6b7280',
+    grid:           dark ? '#334155' : '#f1f5f9',
+    legend:         dark ? '#e2e8f0' : '#374151',
+    doughnutBorder: dark ? '#1e293b' : '#ffffff'
+  };
+}
+
+function tgRenderCharts() {
+  const c = tgChartColors();
+
   const trend = document.getElementById('trendChart');
   if (trend && window.Chart) {
     const labels = JSON.parse(trend.dataset.labels || '[]');
     const values = JSON.parse(trend.dataset.values || '[]');
-    new Chart(trend, {
+    if (_tgTrendChart) _tgTrendChart.destroy();
+    _tgTrendChart = new Chart(trend, {
       type: 'line',
       data: {
         labels,
@@ -36,8 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: {
-          y: { ticks: { callback: v => fmt.money(v) }, grid: { color: '#f1f5f9' } },
-          x: { grid: { display: false } }
+          y: { ticks: { color: c.tick, callback: v => fmt.money(v) }, grid: { color: c.grid } },
+          x: { ticks: { color: c.tick }, grid: { display: false } }
         }
       }
     });
@@ -52,20 +87,30 @@ document.addEventListener('DOMContentLoaded', () => {
       'Site Visit Scheduled': '#6b7280', 'Negotiation': '#111827',
       'Booked': '#059669', 'Lost': '#dc2626', 'Not Interested': '#f87171'
     };
-    new Chart(status, {
+    if (_tgStatusChart) _tgStatusChart.destroy();
+    _tgStatusChart = new Chart(status, {
       type: 'doughnut',
       data: {
         labels,
-        datasets: [{ data: values, backgroundColor: labels.map(l => palette[l] || '#9ca3af'), borderWidth: 2 }]
+        datasets: [{
+          data: values,
+          backgroundColor: labels.map(l => palette[l] || '#9ca3af'),
+          borderWidth: 2,
+          borderColor: c.doughnutBorder
+        }]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         cutout: '62%',
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, color: c.legend } } }
       }
     });
   }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  tgRenderCharts();
 
   // Leads filters
   ['leadSearch', 'leadStatusFilter', 'leadSourceFilter', 'leadProjectFilter'].forEach(id => {
@@ -398,6 +443,13 @@ function tgEditSource(s) {
 }
 
 /* ============================ USERS PAGE ============================ */
+function tgToggleTeamField() {
+  const role = document.getElementById('us_role')?.value;
+  const wrap = document.getElementById('us_team_wrap');
+  if (!wrap) return;
+  wrap.style.display = (role === 'Team Leader' || role === 'Sub Team Leader') ? '' : 'none';
+}
+
 function tgResetUserForm() {
   const form = document.querySelector('#userModal form');
   if (form) form.reset();
@@ -409,6 +461,7 @@ function tgResetUserForm() {
   if (hint) hint.textContent = '(min 6 chars)';
   const title = document.getElementById('userModalTitle');
   if (title) title.textContent = 'Add User';
+  tgToggleTeamField();
 }
 
 function tgEditUser(u) {
@@ -419,13 +472,35 @@ function tgEditUser(u) {
   setVal('us_phone', u.phone);
   setVal('us_role', u.role);
   setVal('us_status', u.status);
+  setVal('us_team', u.team_id || '');
   const pw = document.getElementById('us_password');
   if (pw) { pw.required = false; pw.value = ''; }
   const hint = document.getElementById('usPasswordHint');
   if (hint) hint.textContent = '(leave blank to keep current)';
   const title = document.getElementById('userModalTitle');
   if (title) title.textContent = 'Edit User';
+  tgToggleTeamField();
   new bootstrap.Modal(document.getElementById('userModal')).show();
+}
+
+/* ===== TEAMS ===== */
+function tgResetTeamForm() {
+  const form = document.querySelector('#teamModal form');
+  if (form) form.reset();
+  setVal('tmAction', 'add_team');
+  setVal('tmId', '');
+  const title = document.getElementById('teamModalTitle');
+  if (title) title.textContent = 'Create Team';
+}
+
+function tgEditTeam(t) {
+  setVal('tmAction', 'update_team');
+  setVal('tmId', t._id);
+  setVal('tm_name', t.name);
+  setVal('tm_leader', t.team_leader_id);
+  const title = document.getElementById('teamModalTitle');
+  if (title) title.textContent = 'Edit Team';
+  new bootstrap.Modal(document.getElementById('teamModal')).show();
 }
 /* ===== SMART CSV COLUMN MAPPER ===== */
 

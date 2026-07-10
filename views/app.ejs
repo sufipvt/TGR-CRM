@@ -1,6 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function() {
+      var theme = localStorage.getItem('tgTheme') || 'light';
+      document.documentElement.setAttribute('data-bs-theme', theme);
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title><%= page.charAt(0).toUpperCase() + page.slice(1) %> — TrueGrowth CRM</title>
@@ -14,22 +20,30 @@
 </head>
 <body>
 <%
-  const isManager = ['Admin','MD'].includes(user.role);
-  const isAdmin = user.role === 'Admin';
+  const isSuperAdmin = user.role === 'Super Admin';
+  const isAdminRole  = ['Super Admin','Admin'].includes(user.role);
+  const isManager    = ['Super Admin','Admin','Team Leader'].includes(user.role);
+  const isAdmin      = isSuperAdmin; // kept for backward compat elsewhere in this file
+
   const navItems = [];
   navItems.push({ page: 'dashboard', label: 'Dashboard', icon: 'fa-gauge-high' });
   navItems.push({ page: 'leads', label: isManager ? 'Leads' : 'My Leads', icon: 'fa-user-group' });
   navItems.push({ page: 'followups', label: isManager ? 'Follow-Ups' : 'My Follow-Ups', icon: 'fa-bell' });
-  if (user.role !== 'Caller') navItems.push({ page: 'bookings', label: 'Bookings', icon: 'fa-file-signature' });
+  navItems.push({ page: 'bookings', label: 'Bookings', icon: 'fa-file-signature' });
   if (isManager) {
     navItems.push({ page: 'projects', label: 'Projects', icon: 'fa-building' });
     navItems.push({ page: 'sources', label: 'Lead Sources', icon: 'fa-bullseye' });
+    navItems.push({ page: 'reports', label: 'Reports', icon: 'fa-chart-line' });
   }
-  if (isAdmin) navItems.push({ page: 'users', label: 'Users', icon: 'fa-users-gear' });
-  if (isAdmin) navItems.push({ page: 'settings', label: 'Settings', icon: 'fa-gear' });
-  if (isManager) navItems.push({ page: 'reports', label: 'Reports', icon: 'fa-chart-line' });
-  if (isAdmin) navItems.push({ page: 'audit', label: 'Audit Log', icon: 'fa-clock-rotate-left' });
-  const pageTitles = { dashboard: 'Dashboard', leads: 'Leads', followups: 'Follow-Ups', bookings: 'Bookings', projects: 'Projects', sources: 'Lead Sources', users: 'Users', settings: 'Settings', reports: 'Reports', audit: 'Audit Log' };
+  if (isSuperAdmin) {
+    navItems.push({ page: 'teams', label: 'Teams', icon: 'fa-people-group' });
+    navItems.push({ page: 'users', label: 'Users', icon: 'fa-users-gear' });
+  }
+  if (isAdminRole) {
+    navItems.push({ page: 'settings', label: 'Settings', icon: 'fa-gear' });
+    navItems.push({ page: 'audit', label: 'Audit Log', icon: 'fa-clock-rotate-left' });
+  }
+  const pageTitles = { dashboard: 'Dashboard', leads: 'Leads', followups: 'Follow-Ups', bookings: 'Bookings', projects: 'Projects', sources: 'Lead Sources', users: 'Users', teams: 'Teams', settings: 'Settings', reports: 'Reports', audit: 'Audit Log' };
   const statusColors = { 'New': 'primary', 'Working': 'warning', 'Qualified': 'info', 'Site Visit Scheduled': 'secondary', 'Negotiation': 'dark', 'Booked': 'success', 'Lost': 'danger', 'Not Interested': 'danger' };
 %>
 
@@ -61,6 +75,9 @@
   </button>
   <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
   <div class="tg-profile">
+    <button class="tg-theme-toggle" id="tgThemeToggle" onclick="tgToggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <i class="fa-solid fa-moon" id="tgThemeIcon" aria-hidden="true"></i>
+    </button>
     <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
     <span class="tg-profile-pill"><%= user.name %> <span class="badge tg-role-badge"><%= user.role %></span></span>
   </div>
@@ -169,9 +186,7 @@
           <div class="d-flex flex-column gap-2">
             <a href="/app?page=leads" class="btn btn-outline-primary text-start"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Add Lead</a>
             <a href="/app?page=followups" class="btn btn-outline-primary text-start"><i class="fa-solid fa-bell me-2" aria-hidden="true"></i>View Follow-Ups</a>
-            <% if (user.role !== 'Caller') { %>
-              <a href="/app?page=bookings" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
-            <% } %>
+            <a href="/app?page=bookings" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
             <% if (isManager) { %>
               <a href="/app?page=reports" class="btn btn-outline-primary text-start"><i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>View Reports</a>
             <% } %>
@@ -446,17 +461,17 @@
                 </div>
                 <% if (isManager) { %>
                   <div class="col-md-6">
-                    <label class="form-label" for="lf_caller">Caller <span class="text-secondary">(auto round-robin if blank)</span></label>
+                    <label class="form-label" for="lf_caller">Assigned Agent <span class="text-secondary">(auto round-robin if blank)</span></label>
                     <select class="form-select" id="lf_caller" name="assigned_caller_id">
                       <option value="">Auto-assign</option>
-                      <% data.users.filter(u => u.role === 'Caller').forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %></option><% }) %>
+                      <% data.users.filter(u => ['Team Leader','Sub Team Leader'].includes(u.role)).forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> <%= u.role === 'Team Leader' ? '(TL)' : '' %></option><% }) %>
                     </select>
                   </div>
                   <div class="col-md-6">
-                    <label class="form-label" for="lf_closer">Closer</label>
+                    <label class="form-label" for="lf_closer">Backup / Co-Agent <span class="text-secondary">(optional)</span></label>
                     <select class="form-select" id="lf_closer" name="assigned_closer_id">
                       <option value="">None</option>
-                      <% data.users.filter(u => u.role === 'Closer').forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %></option><% }) %>
+                      <% data.users.filter(u => ['Team Leader','Sub Team Leader'].includes(u.role)).forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> <%= u.role === 'Team Leader' ? '(TL)' : '' %></option><% }) %>
                     </select>
                   </div>
                 <% } %>
@@ -1160,19 +1175,30 @@
       </div>
       <div class="table-responsive">
         <table class="table tg-table align-middle mb-0">
-          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Team</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
+            <% if (!data.users.length) { %><tr><td colspan="8" class="text-secondary text-center py-4">No users yet.</td></tr><% } %>
             <% data.users.forEach(u => { %>
               <tr>
                 <td class="fw-medium"><%= u.full_name %></td>
                 <td><%= u.email %></td>
                 <td><%= u.phone || '—' %></td>
-                <td><span class="badge text-bg-<%= u.role === 'Admin' ? 'dark' : (u.role === 'MD' ? 'primary' : (u.role === 'Closer' ? 'success' : 'info')) %>"><%= u.role %></span></td>
+                <td><span class="badge text-bg-<%= u.role === 'Super Admin' ? 'dark' : (u.role === 'Admin' ? 'primary' : (u.role === 'Team Leader' ? 'warning' : 'info')) %>"><%= u.role %></span></td>
+                <td>
+                  <% if (u.team_id) { %>
+                    <span class="badge text-bg-light border"><%= u.team_id.name %></span>
+                  <% } else { %>
+                    <span class="text-secondary">—</span>
+                  <% } %>
+                </td>
                 <td><span class="badge text-bg-<%= u.status === 'Active' ? 'success' : 'secondary' %>"><%= u.status %></span></td>
                 <td class="text-secondary" style="font-size:13px;"><%= formatDate(u.created_at) %></td>
                 <td class="text-nowrap">
                   <button class="btn btn-sm btn-outline-primary" aria-label="Edit user"
-                    onclick='tgEditUser(<%- JSON.stringify({ _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "", role: u.role, status: u.status }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                    onclick='tgEditUser(<%- JSON.stringify({
+                      _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "",
+                      role: u.role, status: u.status, team_id: u.team_id ? String(u.team_id._id) : ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <a class="btn btn-sm btn-outline-danger" href="/app?page=users&delete=1&table=users&id=<%= u._id %>"
                      onclick="return confirm('Delete this user?')" aria-label="Delete user"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
                 </td>
@@ -1201,9 +1227,17 @@
               <div class="mb-3"><label class="form-label" for="us_phone">Phone</label><input class="form-control" id="us_phone" name="phone"></div>
               <div class="mb-3">
                 <label class="form-label" for="us_role">Role *</label>
-                <select class="form-select" id="us_role" name="role" required>
-                  <% ['Admin','MD','Caller','Closer'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+                <select class="form-select" id="us_role" name="role" required onchange="tgToggleTeamField()">
+                  <% ['Super Admin','Admin','Team Leader','Sub Team Leader'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
                 </select>
+              </div>
+              <div class="mb-3" id="us_team_wrap">
+                <label class="form-label" for="us_team">Team</label>
+                <select class="form-select" id="us_team" name="team_id">
+                  <option value="">None</option>
+                  <% (data.teams || []).forEach(t => { %><option value="<%= t._id %>"><%= t.name %></option><% }) %>
+                </select>
+                <div class="text-secondary mt-1" style="font-size:12px;">Required for Team Leader / Sub Team Leader roles.</div>
               </div>
               <div class="mb-0">
                 <label class="form-label" for="us_status">Status</label>
@@ -1321,6 +1355,106 @@
         <% }) %>
       </div>
     </div>
+  
+  <%# ======================= TEAMS ======================= %>
+  <% } else if (page === 'teams') { %>
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#teamModal" onclick="tgResetTeamForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Create Team</button>
+    </div>
+
+    <div class="row g-3">
+      <% if (!data.teams_detail || !data.teams_detail.length) { %>
+        <div class="col-12"><div class="tg-panel text-center text-secondary py-5">No teams yet. Create your first team to start assigning agents.</div></div>
+      <% } %>
+      <% (data.teams_detail || []).forEach(t => { %>
+        <div class="col-md-6 col-xl-4">
+          <div class="tg-panel h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h6 fw-bold mb-1"><%= t.name %></h2>
+                <div class="text-secondary" style="font-size:13px;">
+                  <i class="fa-solid fa-user-tie me-1" aria-hidden="true"></i>
+                  <%= t.team_leader_id ? t.team_leader_id.full_name : 'No Team Leader assigned' %>
+                </div>
+              </div>
+              <span class="badge text-bg-info"><%= t.members.length %> member<%= t.members.length !== 1 ? 's' : '' %></span>
+            </div>
+
+            <div class="mt-3" style="font-size:13px;">
+              <% if (!t.members.length) { %>
+                <p class="text-secondary mb-0">No members assigned yet.</p>
+              <% } else { %>
+                <% t.members.forEach(m => { %>
+                  <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span><%= m.full_name %></span>
+                    <span class="badge text-bg-<%= m.role === 'Team Leader' ? 'dark' : 'light' %> border" style="font-size:10px;"><%= m.role %></span>
+                  </div>
+                <% }) %>
+              <% } %>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-sm btn-outline-primary" aria-label="Edit team"
+                onclick='tgEditTeam(<%- JSON.stringify({
+                  _id: String(t._id), name: t.name,
+                  team_leader_id: t.team_leader_id ? String(t.team_leader_id._id) : ""
+                }) %>)'><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit</button>
+              <a class="btn btn-sm btn-outline-danger" href="/app?page=teams&delete=1&table=teams&id=<%= t._id %>"
+                 onclick="return confirm('Delete this team? Members must be reassigned first.')" aria-label="Delete team"><i class="fa-solid fa-trash me-1" aria-hidden="true"></i>Delete</a>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <% if (data.unassigned_users && data.unassigned_users.length) { %>
+    <div class="tg-panel mt-3">
+      <h2 class="tg-panel-title">Unassigned Users</h2>
+      <p class="text-secondary" style="font-size:13px;">These users aren't in any team yet. Assign them from the Users page.</p>
+      <div class="d-flex flex-wrap gap-2">
+        <% data.unassigned_users.forEach(u => { %>
+          <span class="badge text-bg-light border py-2 px-3"><%= u.full_name %> <span class="text-secondary">(<%= u.role %>)</span></span>
+        <% }) %>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- Team Modal -->
+    <div class="modal fade" id="teamModal" tabindex="-1" aria-labelledby="teamModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=teams">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="teamModalTitle">Create Team</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_team" id="tmAction">
+              <input type="hidden" name="team_id" id="tmId">
+              <div class="mb-3">
+                <label class="form-label" for="tm_name">Team Name *</label>
+                <input class="form-control" id="tm_name" name="name" required placeholder="e.g. North Zone Sales">
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="tm_leader">Team Leader</label>
+                <select class="form-select" id="tm_leader" name="team_leader_id">
+                  <option value="">None yet</option>
+                  <% (data.all_agents || []).forEach(u => { %>
+                    <option value="<%= u._id %>"><%= u.full_name %> <%= u.role !== 'Sub Team Leader' ? '(' + u.role + ')' : '' %></option>
+                  <% }) %>
+                </select>
+                <div class="text-secondary mt-1" style="font-size:12px;">Selecting a user here promotes them to Team Leader.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Team</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
   <% } %>
   <!-- Complete Follow-Up Modal -->
 <div class="modal fade" id="completeModal" tabindex="-1">

@@ -416,3 +416,101 @@ body {
 .tg-kanban-card:hover .tg-kanban-card-actions {
   display: flex;
 }
+
+/* ===== THEME TOGGLE BUTTON ===== */
+.tg-theme-toggle {
+  background: none;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: inherit;
+  font-size: 15px;
+  transition: background 0.15s;
+}
+.tg-theme-toggle:hover { background: rgba(0,0,0,0.05); }
+
+/* ===== DARK MODE ===== */
+[data-bs-theme="dark"] body,
+[data-bs-theme="dark"] .tg-content {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+[data-bs-theme="dark"] .tg-topbar {
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+[data-bs-theme="dark"] .tg-page-title { color: #f1f5f9; }
+[data-bs-theme="dark"] .tg-welcome { color: #94a3b8; }
+[data-bs-theme="dark"] .tg-profile-pill {
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+}
+[data-bs-theme="dark"] .tg-theme-toggle {
+  border-color: #334155;
+  color: #e2e8f0;
+}
+[data-bs-theme="dark"] .tg-theme-toggle:hover { background: #334155; }
+
+[data-bs-theme="dark"] .tg-panel {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e2e8f0;
+}
+[data-bs-theme="dark"] .tg-panel-title { color: #f1f5f9; }
+
+[data-bs-theme="dark"] .tg-table { color: #e2e8f0; }
+[data-bs-theme="dark"] .tg-table thead th { color: #94a3b8; border-color: #334155; }
+[data-bs-theme="dark"] .tg-table td,
+[data-bs-theme="dark"] .tg-table th { border-color: #334155; }
+[data-bs-theme="dark"] .tg-table tbody tr:hover { background: #273449; }
+
+[data-bs-theme="dark"] .text-secondary { color: #94a3b8 !important; }
+
+[data-bs-theme="dark"] .tg-mini-kpi { background: #273449; border: 1px solid #334155; }
+[data-bs-theme="dark"] .tg-mini-value { color: #f1f5f9; }
+[data-bs-theme="dark"] .tg-mini-label { color: #94a3b8; }
+[data-bs-theme="dark"] .tg-mini-danger { background: rgba(220,38,38,0.15); border-color: rgba(220,38,38,0.3); }
+
+[data-bs-theme="dark"] .badge.text-bg-light {
+  background: #334155 !important;
+  color: #e2e8f0 !important;
+  border-color: #475569 !important;
+}
+
+[data-bs-theme="dark"] .form-control,
+[data-bs-theme="dark"] .form-select {
+  background-color: #273449;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+[data-bs-theme="dark"] .form-control::placeholder { color: #64748b; }
+[data-bs-theme="dark"] .form-control:focus,
+[data-bs-theme="dark"] .form-select:focus {
+  background-color: #273449;
+  color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .modal-content { background: #1e293b; color: #e2e8f0; }
+[data-bs-theme="dark"] .modal-header,
+[data-bs-theme="dark"] .modal-footer { border-color: #334155; }
+[data-bs-theme="dark"] .offcanvas { background: #1e293b; color: #e2e8f0; }
+
+[data-bs-theme="dark"] .btn-outline-secondary { color: #94a3b8; border-color: #475569; }
+[data-bs-theme="dark"] .btn-outline-secondary:hover { background: #334155; color: #e2e8f0; }
+
+[data-bs-theme="dark"] .tg-kanban-card { background: #273449; border-color: #334155; }
+[data-bs-theme="dark"] .tg-kanban-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.4); }
+[data-bs-theme="dark"] .tg-kanban-cards.drag-over { background: rgba(26, 86, 219, 0.15); }
+
+[data-bs-theme="dark"] .tg-audit-item,
+[data-bs-theme="dark"] .tg-timeline-item { border-color: #334155; }
+
+[data-bs-theme="dark"] #tgChatWindow { background: #1e293b; border-color: #334155; }
+[data-bs-theme="dark"] #tgChatMessages { background: #0f172a; }
+[data-bs-theme="dark"] .tg-msg-bot { background: #273449; color: #e2e8f0; }

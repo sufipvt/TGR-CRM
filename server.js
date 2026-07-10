@@ -46,11 +46,14 @@ const IS_PROD = process.env.NODE_ENV === 'production';
 // ---------------------------------------------------------------------------
 const { Schema, Types } = mongoose;
 
+const USER_ROLES = ['Super Admin', 'Admin', 'Team Leader', 'Sub Team Leader'];
+
 const User = mongoose.model('User', new Schema({
   full_name: { type: String, required: true },
   email:     { type: String, required: true, unique: true, lowercase: true },
   password:  { type: String, required: true },
-  role:      { type: String, enum: ['Admin', 'MD', 'Caller', 'Closer'], required: true },
+  role:      { type: String, enum: USER_ROLES, required: true },
+  team_id:   { type: Schema.Types.ObjectId, ref: 'Team' },
   phone:     String,
   status:    { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   created_at:{ type: Date, default: Date.now }
@@ -141,6 +144,12 @@ const Payment = mongoose.model('Payment', new Schema({
   notes:        String
 }));
 
+const Team = mongoose.model('Team', new Schema({
+  name:            { type: String, required: true, unique: true },
+  team_leader_id:  { type: Schema.Types.ObjectId, ref: 'User' },
+  created_at:      { type: Date, default: Date.now }
+}));
+
 const AuditLog = mongoose.model('AuditLog', new Schema({
   user_email: String,
   action:     String,
@@ -196,7 +205,7 @@ async function getSettings() {
 }
 
 async function getNextCaller() {
-  const callers = await User.find({ role: 'Caller', status: 'Active' }).select('_id');
+  const callers = await User.find({ role: 'Sub Team Leader', status: 'Active' }).select('_id');
   if (!callers.length) return null;
   const counts = await Lead.aggregate([
     { $match: { assigned_caller_id: { $in: callers.map(c => c._id) } } },
@@ -208,29 +217,61 @@ async function getNextCaller() {
   return callers.sort((a, b) => countMap[String(a._id)] - countMap[String(b._id)])[0]._id;
 }
 
-function isManager(role) { return ['Admin', 'MD'].includes(role); }
+function isSuperAdmin(role) { return role === 'Super Admin'; }
+function isAdminRole(role)  { return ['Super Admin', 'Admin'].includes(role); }
+function isTeamLeader(role) { return role === 'Team Leader'; }
+function isManager(role)    { return ['Super Admin', 'Admin', 'Team Leader'].includes(role); } // kept for backward compat across the file
+
+// Get all Sub-TL user IDs under a Team Leader's team
+async function getTeamMemberIds(user) {
+  if (!user.team_id) return [];
+  const members = await User.find({ team_id: user.team_id }).select('_id');
+  return members.map(m => m._id);
+}
 
 // Visibility filters per role
-function visibleLeadFilter(user) {
-  if (isManager(user.role)) return {};
-  if (user.role === 'Caller') return { assigned_caller_id: new Types.ObjectId(user.userId) };
-  return { assigned_closer_id: new Types.ObjectId(user.userId) }; // Closer
+async function visibleLeadFilter(user) {
+  if (isAdminRole(user.role)) return {};
+  if (isTeamLeader(user.role)) {
+    const memberIds = await getTeamMemberIds(user);
+    return {
+      $or: [
+        { assigned_caller_id: { $in: memberIds } },
+        { assigned_closer_id: { $in: memberIds } }
+      ]
+    };
+  }
+  // Sub Team Leader — sees only own leads (as caller or closer)
+  const uid = new Types.ObjectId(user.userId);
+  return { $or: [{ assigned_caller_id: uid }, { assigned_closer_id: uid }] };
 }
-function visibleFollowUpFilter(user) {
-  if (isManager(user.role)) return {};
+async function visibleFollowUpFilter(user) {
+  if (isAdminRole(user.role)) return {};
+  if (isTeamLeader(user.role)) {
+    const memberIds = await getTeamMemberIds(user);
+    return { assigned_to_id: { $in: memberIds } };
+  }
   return { assigned_to_id: new Types.ObjectId(user.userId) };
 }
-function visibleBookingFilter(user) {
-  if (isManager(user.role)) return {};
-  if (user.role === 'Closer') return { closer_id: new Types.ObjectId(user.userId) };
-  return { _id: null }; // Callers see no bookings
+async function visibleBookingFilter(user) {
+  if (isAdminRole(user.role)) return {};
+  if (isTeamLeader(user.role)) {
+    const memberIds = await getTeamMemberIds(user);
+    return { closer_id: { $in: memberIds } };
+  }
+  return { closer_id: new Types.ObjectId(user.userId) };
 }
 async function canEditLead(user, leadId) {
-  if (isManager(user.role)) return true;
+  if (isAdminRole(user.role)) return true;
   const lead = await Lead.findById(leadId).select('assigned_caller_id assigned_closer_id');
   if (!lead) return false;
   const uid = String(user.userId);
-  return String(lead.assigned_caller_id || '') === uid || String(lead.assigned_closer_id || '') === uid;
+  if (String(lead.assigned_caller_id || '') === uid || String(lead.assigned_closer_id || '') === uid) return true;
+  if (isTeamLeader(user.role)) {
+    const memberIds = (await getTeamMemberIds(user)).map(String);
+    return memberIds.includes(String(lead.assigned_caller_id || '')) || memberIds.includes(String(lead.assigned_closer_id || ''));
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +289,11 @@ function requireAuth(req, res, next) {
   }
 }
 function requireAdmin(req, res, next) {
-  if (!['Admin', 'MD'].includes(req.user.role)) return res.status(403).send('Forbidden');
+  if (!isAdminRole(req.user.role)) return res.status(403).send('Forbidden');
+  next();
+}
+function requireSuperAdmin(req, res, next) {
+  if (!isSuperAdmin(req.user.role)) return res.status(403).send('Forbidden');
   next();
 }
 
@@ -306,7 +351,7 @@ app.post('/login', loginLimiter, async (req, res) => {
       return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password'));
     }
     const token = jwt.sign(
-      { userId: user._id, role: user.role, email: user.email, name: user.full_name },
+      { userId: user._id, role: user.role, email: user.email, name: user.full_name, team_id: user.team_id || null },
       process.env.JWT_SECRET,
       { expiresIn: '8h' }
     );
@@ -608,7 +653,6 @@ async function handlePostAction(req) {
       return 'Lead marked ' + body.status + '.';
     }
     case 'qualify_lead': {
-      if (user.role === 'Closer') throw Object.assign(new Error('Forbidden'), { status: 403 });
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
       await Lead.findByIdAndUpdate(body.lead_id, {
         status: 'Qualified',
@@ -673,19 +717,24 @@ async function handlePostAction(req) {
       return 'Source updated.';
     }
     case 'add_user': {
-      if (user.role !== 'Admin') throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
       if (!body.password || body.password.length < 6) throw Object.assign(new Error('Password must be at least 6 characters'), { status: 400 });
       const hashed = await bcrypt.hash(body.password, 12);
       const nu = await User.create({
         full_name: body.full_name, email: (body.email || '').toLowerCase(), password: hashed,
-        role: body.role, phone: body.phone, status: body.status || 'Active'
+        role: body.role, phone: body.phone, status: body.status || 'Active',
+        team_id: objIdOrNull(body.team_id)
       });
       await audit(user.email, 'create', 'User', nu._id, { email: body.email, role: body.role });
       return 'User added.';
     }
     case 'update_user': {
-      if (user.role !== 'Admin') throw Object.assign(new Error('Forbidden'), { status: 403 });
-      const update = { full_name: body.full_name, email: (body.email || '').toLowerCase(), role: body.role, phone: body.phone, status: body.status };
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      const update = {
+        full_name: body.full_name, email: (body.email || '').toLowerCase(),
+        role: body.role, phone: body.phone, status: body.status,
+        team_id: objIdOrNull(body.team_id)
+      };
       if (body.password) update.password = await bcrypt.hash(body.password, 12);
       await User.findByIdAndUpdate(body.user_id, update);
       await audit(user.email, 'update', 'User', body.user_id, { email: body.email });
@@ -721,12 +770,11 @@ async function handlePostAction(req) {
       return 'Follow-up completed.';
     }
     case 'add_booking': {
-      if (user.role === 'Caller') throw Object.assign(new Error('Forbidden'), { status: 403 });
       const leadId = objIdOrNull(body.lead_id);
       const lead = await Lead.findById(leadId);
       if (!lead) throw Object.assign(new Error('Lead not found'), { status: 404 });
       const closerId = manager ? (objIdOrNull(body.closer_id) || new Types.ObjectId(user.userId)) : new Types.ObjectId(user.userId);
-      if (user.role === 'Closer' && String(lead.assigned_closer_id || '') !== String(user.userId)) {
+      if (!manager && String(lead.assigned_closer_id || '') !== String(user.userId)) {
         throw Object.assign(new Error('You can only book your own leads'), { status: 403 });
       }
       const b = await Booking.create({
@@ -753,7 +801,6 @@ async function handlePostAction(req) {
       return 'Booking updated.';
     }
     case 'add_payment': {
-      if (user.role === 'Caller') throw Object.assign(new Error('Forbidden'), { status: 403 });
       const b = await Booking.findById(body.booking_id);
       if (!b) throw Object.assign(new Error('Booking not found'), { status: 404 });
       if (!manager && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
@@ -770,7 +817,48 @@ async function handlePostAction(req) {
       await audit(user.email, 'create', 'Payment', p._id, { booking_id: String(b._id), amount: amt });
       return 'Payment recorded.';
     }
+
+    case 'add_team': {
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      const t = await Team.create({
+        name: body.name,
+        team_leader_id: objIdOrNull(body.team_leader_id)
+      });
+      // If a Team Leader is assigned, update their role + team_id
+      if (body.team_leader_id) {
+        await User.findByIdAndUpdate(body.team_leader_id, { role: 'Team Leader', team_id: t._id });
+      }
+      await audit(user.email, 'create', 'Team', t._id, { name: body.name });
+      return 'Team created.';
+    }
+    case 'update_team': {
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      const oldTeam = await Team.findById(body.team_id);
+      const newLeaderId = objIdOrNull(body.team_leader_id);
+
+      // Demote old leader to Sub Team Leader if changed
+      if (oldTeam?.team_leader_id && String(oldTeam.team_leader_id) !== String(newLeaderId)) {
+        await User.findByIdAndUpdate(oldTeam.team_leader_id, { role: 'Sub Team Leader' });
+      }
+      // Promote new leader
+      if (newLeaderId) {
+        await User.findByIdAndUpdate(newLeaderId, { role: 'Team Leader', team_id: body.team_id });
+      }
+
+      await Team.findByIdAndUpdate(body.team_id, { name: body.name, team_leader_id: newLeaderId });
+      await audit(user.email, 'update', 'Team', body.team_id, { name: body.name });
+      return 'Team updated.';
+    }
+    case 'assign_team_member': {
+      if (!isSuperAdmin(user.role) && !isTeamLeader(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      await User.findByIdAndUpdate(body.user_id, { team_id: objIdOrNull(body.team_id) });
+      await audit(user.email, 'update', 'User', body.user_id, { team_assigned: body.team_id });
+      return 'Team member assigned.';
+    }
+
     case 'save_settings': {
+
+    
       if (user.role !== 'Admin') throw Object.assign(new Error('Forbidden'), { status: 403 });
       const keys = ['company_name', 'currency', 'currency_symbol', 'tax_rate', 'booking_prefix', 'lead_prefix', 'default_commission'];
       for (const key of keys) {
@@ -823,10 +911,18 @@ async function handleDelete(req) {
       break;
     }
     case 'users': {
-      if (user.role !== 'Admin') throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
       if (String(id) === String(user.userId)) throw Object.assign(new Error('Cannot delete yourself'), { status: 400 });
       await User.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'User', id, {});
+      break;
+    }
+    case 'teams': {
+      if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      const memberCount = await User.countDocuments({ team_id: id });
+      if (memberCount > 0) throw Object.assign(new Error('Cannot delete: team has members. Reassign them first.'), { status: 400 });
+      await Team.findByIdAndDelete(id);
+      await audit(user.email, 'delete', 'Team', id, {});
       break;
     }
     case 'followups': {
@@ -866,7 +962,8 @@ async function handleDelete(req) {
   }
 }
 
-const ADMIN_PAGES = ['users', 'settings', 'audit'];
+const ADMIN_PAGES = ['settings', 'audit'];
+const SUPERADMIN_PAGES = ['users', 'teams'];
 const MANAGER_PAGES = ['reports', 'sources'];
 
 async function appHandler(req, res) {
@@ -898,35 +995,35 @@ async function appHandler(req, res) {
     }
 
     // Page-level RBAC
-    if (ADMIN_PAGES.includes(page) && user.role !== 'Admin') page = 'dashboard';
+    if (SUPERADMIN_PAGES.includes(page) && !isSuperAdmin(user.role)) page = 'dashboard';
+    if (ADMIN_PAGES.includes(page) && !isAdminRole(user.role)) page = 'dashboard';
     if (MANAGER_PAGES.includes(page) && !isManager(user.role)) page = 'dashboard';
 
-    const leadFilter = visibleLeadFilter(user);
-    const fuFilter = visibleFollowUpFilter(user);
-    const bookingFilter = visibleBookingFilter(user);
+    const leadFilter = await visibleLeadFilter(user);
+    const fuFilter = await visibleFollowUpFilter(user);
+    const bookingFilter = await visibleBookingFilter(user);
     const userId = new Types.ObjectId(user.userId);
 
     const data = {};
     data.projects = await Project.find().sort('name');
     data.sources = await LeadSource.find().sort('name');
 
-    if (page === 'dashboard') {
+  if (page === 'dashboard') {
       const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
       data.total_leads = await Lead.countDocuments(leadFilter);
       data.total_bookings = await Booking.countDocuments(bookingFilter);
       data.total_projects = await Project.countDocuments();
-      const fuOwnFilter = isManager(user.role) ? {} : { assigned_to_id: userId };
-      data.pending_followups = await FollowUp.countDocuments({ ...fuOwnFilter, status: 'Pending' });
-      data.overdue_followups = await FollowUp.countDocuments({ ...fuOwnFilter, status: 'Pending', scheduled_date: { $lt: new Date() } });
+      data.pending_followups = await FollowUp.countDocuments({ ...fuFilter, status: 'Pending' });
+      data.overdue_followups = await FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } });
       const rev = await Booking.aggregate([
-        ...(isManager(user.role) ? [] : [{ $match: bookingFilter }]),
+        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
         { $group: { _id: null, total: { $sum: '$sale_value' } } }
       ]);
       data.total_revenue = rev.length ? rev[0].total : 0;
       data.new_today = await Lead.countDocuments({ ...leadFilter, created_at: { $gte: startOfToday } });
       data.recent_leads = await Lead.find(leadFilter).sort('-created_at').limit(8).populate('project_id source_id assigned_caller_id');
       data.booking_trend = await Booking.aggregate([
-        ...(isManager(user.role) ? [] : [{ $match: bookingFilter }]),
+        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$booking_date' } }, revenue: { $sum: '$sale_value' } } },
         { $sort: { _id: 1 } }, { $limit: 12 }
       ]);
@@ -935,6 +1032,7 @@ async function appHandler(req, res) {
         { $group: { _id: '$status', count: { $sum: 1 } } }
       ]);
       data.closer_perf = isManager(user.role) ? await Booking.aggregate([
+        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
         { $group: { _id: '$closer_id', count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } },
         { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'closer' } },
         { $sort: { revenue: -1 } }
@@ -943,25 +1041,36 @@ async function appHandler(req, res) {
       data.leads = await Lead.find(leadFilter)
         .populate('project_id source_id assigned_caller_id assigned_closer_id')
         .sort('-created_at');
-      data.users = await User.find({ status: 'Active' }).select('full_name role');
+      data.users = isTeamLeader(user.role)
+        ? await User.find({ status: 'Active', team_id: user.team_id }).select('full_name role')
+        : await User.find({ status: 'Active' }).select('full_name role');
     } else if (page === 'followups') {
       data.followups = await FollowUp.find(fuFilter).populate({ path: 'lead_id', select: 'name phone' }).populate('assigned_to_id').sort('scheduled_date');
       data.leads_for_fu = await Lead.find(leadFilter).select('name phone').sort('name');
       data.users = await User.find({ status: 'Active' }).select('full_name role');
     } else if (page === 'bookings') {
-      if (user.role === 'Caller') { page = 'dashboard'; return res.redirect('/app?page=dashboard'); }
       data.bookings = await Booking.find(bookingFilter)
         .populate('lead_id project_id unit_id closer_id')
         .sort('-booking_date');
       data.payments = await Payment.find({ booking_id: { $in: data.bookings.map(b => b._id) } });
-      data.closers = await User.find({ role: 'Closer', status: 'Active' }).select('full_name');
+      data.closers = await User.find({ role: { $in: ['Team Leader', 'Sub Team Leader'] }, status: 'Active' }).select('full_name');
       data.qualified_leads = await Lead.find({ ...leadFilter, status: { $in: ['Qualified', 'Site Visit Scheduled', 'Negotiation'] } }).select('name phone project_id');
     } else if (page === 'projects') {
       if (!isManager(user.role)) return res.redirect('/app?page=dashboard');
       data.projects_detail = data.projects;
       data.units = await Unit.find().sort('unit_number');
     } else if (page === 'users') {
-      data.users = await User.find().sort('full_name').select('-password');
+      data.users = await User.find().sort('full_name').select('-password').populate('team_id');
+      data.teams = await Team.find().sort('name');
+    } else if (page === 'teams') {
+      data.teams = await Team.find().populate('team_leader_id').sort('name');
+      const allUsers = await User.find({ status: 'Active' }).select('full_name role team_id');
+      data.teams_detail = await Promise.all(data.teams.map(async t => ({
+        ...t.toObject(),
+        members: allUsers.filter(u => String(u.team_id || '') === String(t._id))
+      })));
+      data.unassigned_users = allUsers.filter(u => !u.team_id && u.role !== 'Super Admin' && u.role !== 'Admin');
+      data.all_agents = allUsers.filter(u => ['Team Leader', 'Sub Team Leader'].includes(u.role));
     } else if (page === 'settings') {
       data.settings = await getSettings();
     } else if (page === 'reports') {
@@ -969,7 +1078,7 @@ async function appHandler(req, res) {
       const to = req.query.to ? new Date(req.query.to + 'T23:59:59') : new Date();
       data.report_from = from.toISOString().slice(0, 10);
       data.report_to = to.toISOString().slice(0, 10);
-      const rangeFilter = { created_at: { $gte: from, $lte: to } };
+      const rangeFilter = { created_at: { $gte: from, $lte: to }, ...leadFilter };
       const bookingRangeFilter = { booking_date: { $gte: from, $lte: to } };
       const totalLeads = await Lead.countDocuments(rangeFilter);
       const qualified = await Lead.countDocuments({ ...rangeFilter, qualified_at: { $ne: null } });
@@ -982,12 +1091,14 @@ async function appHandler(req, res) {
         funnel
       };
       data.followup_report = {
-        pending: await FollowUp.countDocuments({ status: 'Pending' }),
-        overdue: await FollowUp.countDocuments({ status: 'Pending', scheduled_date: { $lt: new Date() } }),
-        completed: await FollowUp.countDocuments({ status: 'Completed', completed_date: { $gte: from, $lte: to } }),
-        missed: await FollowUp.countDocuments({ status: 'Missed' })
+        pending: await FollowUp.countDocuments({ ...fuFilter, status: 'Pending' }),
+        overdue: await FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }),
+        completed: await FollowUp.countDocuments({ ...fuFilter, status: 'Completed', completed_date: { $gte: from, $lte: to } }),
+        missed: await FollowUp.countDocuments({ ...fuFilter, status: 'Missed' })
       };
-      const users = await User.find({ status: 'Active' }).select('full_name role');
+      const users = isAdminRole(user.role)
+        ? await User.find({ status: 'Active' }).select('full_name role')
+        : await User.find({ status: 'Active', $or: [{ team_id: user.team_id }, { _id: userId }] }).select('full_name role');
       data.performance_report = [];
       for (const u of users) {
         const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
@@ -1251,7 +1362,7 @@ app.post('/api/chat', requireAuth, async (req, res) => {
 });
 
 function isAdminOrMD(user) {
-  return ['Admin', 'MD'].includes(user.role);
+  return ['Super Admin', 'Admin', 'Team Leader'].includes(user.role);
 }
 
 // 404 catch-all
@@ -1306,7 +1417,7 @@ async function sendDailyDigest() {
     let sent = 0, skipped = 0;
     const teamStats = [];
 
-    for (const u of users.filter(x => ['Caller', 'Closer'].includes(x.role))) {
+    for (const u of users.filter(x => x.role === 'Sub Team Leader')) {
       const fus = await FollowUp.find({ assigned_to_id: u._id, status: 'Pending' }).populate({ path: 'lead_id', select: 'name phone' }).sort('scheduled_date');
       const overdue = fus.filter(f => f.scheduled_date < startOfToday);
       const today = fus.filter(f => f.scheduled_date >= startOfToday && f.scheduled_date <= endOfToday);
@@ -1336,7 +1447,7 @@ async function sendDailyDigest() {
     // MD/Admin summary
     const newToday = await Lead.countDocuments({ created_at: { $gte: startOfToday } });
     const totalOverdue = teamStats.reduce((s, t) => s + t.overdue, 0);
-    for (const m of users.filter(x => ['Admin', 'MD'].includes(x.role))) {
+    for (const m of users.filter(x => ['Super Admin', 'Admin', 'Team Leader'].includes(x.role))) {
       const kpis = digestKpiBox('Team Overdue', totalOverdue, totalOverdue > 0 ? '#dc2626' : '#6b7280') +
         digestKpiBox('New Leads Today', newToday, '#1a56db') +
         digestKpiBox('Active Agents', teamStats.length, '#059669');
