@@ -20,6 +20,7 @@ const cron = require('node-cron');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const path = require('path');
+const PDFDocument = require('pdfkit');
 
 // ---------------------------------------------------------------------------
 // ENV VALIDATION
@@ -93,6 +94,26 @@ const LeadSource = mongoose.model('LeadSource', new Schema({
 }));
 
 const LEAD_STATUSES = ['New', 'Working', 'Qualified', 'Site Visit Scheduled', 'Negotiation', 'Booked', 'Lost', 'Not Interested'];
+const LEAD_TEMPERATURES = ['Hot', 'Warm', 'Cold'];
+
+// Result of the LAST call attempt — independent of pipeline status
+const CONTACT_OUTCOMES = [
+  'Interested', 'Not Interested', 'Requested Callback',
+  'Not Reachable', 'Switched Off', 'Call Rejected', 'Invalid Number'
+];
+const BAD_CONTACT_OUTCOMES = ['Not Reachable', 'Switched Off', 'Call Rejected', 'Invalid Number'];
+
+// WHY a lead rejected the property — only relevant once status is Not Interested or Lost
+const NOT_INTERESTED_REASONS = [
+  'Budget Mismatch', 'Location Mismatch', 'Timeline Mismatch (not buying soon)',
+  'Property Type Mismatch', 'Already Purchased Elsewhere', 'Other'
+];
+const LOST_REASONS = [
+  'Chose a Competitor Project', 'Price Negotiation Failed',
+  'Financing / Loan Rejected', 'Changed Mind', 'Other'
+];
+const DISPOSITION_REASONS = [...new Set([...NOT_INTERESTED_REASONS, ...LOST_REASONS])];
+
 const Lead = mongoose.model('Lead', new Schema({
   name:               { type: String, required: true },
   phone:              { type: String, required: true },
@@ -102,6 +123,9 @@ const Lead = mongoose.model('Lead', new Schema({
   budget_range:       String,
   source_id:          { type: Schema.Types.ObjectId, ref: 'LeadSource', required: true },
   status:             { type: String, enum: LEAD_STATUSES, default: 'New' },
+  temperature:        { type: String, enum: LEAD_TEMPERATURES },
+  contact_outcome:    { type: String, enum: CONTACT_OUTCOMES },
+  disposition_reason: { type: String, enum: DISPOSITION_REASONS },
   assigned_caller_id: { type: Schema.Types.ObjectId, ref: 'User' },
   assigned_closer_id: { type: Schema.Types.ObjectId, ref: 'User' },
   notes:              String,
@@ -178,6 +202,113 @@ function formatDateTime(d) {
   if (!d) return '\u2014';
   return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+function formatMoneyPdf(n) {
+  return 'Rs. ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+}
+
+const PDF_COLORS = {
+  brand: '#1a56db', dark: '#111827', gray: '#6b7280',
+  lightGray: '#f1f5f9', border: '#e5e7eb', green: '#059669', red: '#dc2626'
+};
+const STATUS_COLORS_PDF = {
+  'New': '#1a56db', 'Working': '#d97706', 'Qualified': '#0d9488',
+  'Site Visit Scheduled': '#6b7280', 'Negotiation': '#111827',
+  'Booked': '#059669', 'Lost': '#dc2626', 'Not Interested': '#f87171'
+};
+
+function pdfHeader(doc, companyName, scopeLabel, from, to) {
+  doc.rect(0, 0, doc.page.width, 90).fill(PDF_COLORS.brand);
+  doc.fontSize(20).fillColor('#ffffff').font('Helvetica-Bold').text(companyName, 40, 25);
+  doc.fontSize(11).fillColor('#dbeafe').font('Helvetica').text('Performance Report', 40, 50);
+  doc.fontSize(9).fillColor('#dbeafe').text(
+    'Scope: ' + scopeLabel + '   |   Period: ' + from.toLocaleDateString('en-IN') + ' - ' + to.toLocaleDateString('en-IN'),
+    40, 66
+  );
+  doc.y = 105;
+  doc.fillColor(PDF_COLORS.dark).font('Helvetica');
+}
+
+function pdfSectionHeader(doc, title) {
+  if (doc.y > doc.page.height - 100) doc.addPage();
+  doc.moveDown(0.6);
+  const y = doc.y;
+  doc.rect(40, y, 4, 16).fill(PDF_COLORS.brand);
+  doc.fontSize(13).fillColor(PDF_COLORS.dark).font('Helvetica-Bold').text(title, 52, y - 1);
+  doc.font('Helvetica').fillColor(PDF_COLORS.dark);
+  doc.moveDown(0.6);
+}
+
+function pdfKpiCards(doc, items) {
+  const pageWidth = doc.page.width - 80;
+  const gap = 8;
+  const boxWidth = (pageWidth - gap * (items.length - 1)) / items.length;
+  const startY = doc.y;
+  const boxHeight = 54;
+  items.forEach((item, i) => {
+    const x = 40 + i * (boxWidth + gap);
+    const color = item.color || PDF_COLORS.brand;
+    doc.fillOpacity(0.10).roundedRect(x, startY, boxWidth, boxHeight, 6).fill(color);
+    doc.fillOpacity(1);
+    doc.roundedRect(x, startY, boxWidth, boxHeight, 6).lineWidth(1).strokeColor(color).stroke();
+    doc.fontSize(16).fillColor(PDF_COLORS.dark).font('Helvetica-Bold')
+      .text(String(item.value), x + 10, startY + 10, { width: boxWidth - 20 });
+    doc.fontSize(8).fillColor(PDF_COLORS.gray).font('Helvetica')
+      .text(item.label, x + 10, startY + 32, { width: boxWidth - 20 });
+  });
+  doc.y = startY + boxHeight + 14;
+}
+
+function pdfTable(doc, headers, rows, colWidths, options = {}) {
+  const startX = 40;
+  const pageWidth = doc.page.width - 80;
+  let y = doc.y;
+
+  function drawHeaderRow() {
+    doc.rect(startX, y, pageWidth, 22).fill(PDF_COLORS.dark);
+    let hx = startX;
+    doc.fontSize(9).fillColor('#ffffff').font('Helvetica-Bold');
+    headers.forEach((h, i) => { doc.text(h, hx + 8, y + 6, { width: colWidths[i] - 8 }); hx += colWidths[i]; });
+    y += 22;
+    doc.font('Helvetica').fillColor(PDF_COLORS.dark);
+  }
+  drawHeaderRow();
+
+  rows.forEach((row, rIdx) => {
+    if (y > doc.page.height - 60) { doc.addPage(); y = 40; drawHeaderRow(); }
+    const rowHeight = 20;
+    if (rIdx % 2 === 1) doc.rect(startX, y, pageWidth, rowHeight).fill(PDF_COLORS.lightGray);
+    let x = startX;
+    doc.fontSize(9);
+    row.forEach((cell, i) => {
+      if (options.badgeColumn === i && options.badgeColors) {
+        const color = options.badgeColors[cell] || PDF_COLORS.gray;
+        const w = Math.min(doc.widthOfString(String(cell)) + 12, colWidths[i] - 12);
+        doc.roundedRect(x + 6, y + 4, w, 13, 6).fill(color);
+        doc.fontSize(8).fillColor('#ffffff').text(String(cell), x + 12, y + 7, { width: colWidths[i] - 20 });
+        doc.fontSize(9).fillColor(PDF_COLORS.dark);
+      } else {
+        let cellColor = PDF_COLORS.dark;
+        if (options.colorRules) {
+          const rule = options.colorRules.find(r => r.col === i && r.test(cell));
+          if (rule) cellColor = rule.color;
+        }
+        doc.fillColor(cellColor).text(String(cell), x + 8, y + 5, { width: colWidths[i] - 12 });
+        doc.fillColor(PDF_COLORS.dark);
+      }
+      x += colWidths[i];
+    });
+    y += rowHeight;
+  });
+  doc.moveTo(startX, y).lineTo(startX + pageWidth, y).strokeColor(PDF_COLORS.border).stroke();
+  doc.y = y + 14;
+}
+
+function pdfFooter(doc, pageNum, totalPages, companyName) {
+  const bottom = doc.page.height - 30;
+  doc.fontSize(8).fillColor(PDF_COLORS.gray)
+    .text(companyName + ' \u2014 Confidential', 40, bottom, { width: 300 })
+    .text('Page ' + pageNum + ' of ' + totalPages, doc.page.width - 140, bottom, { width: 100, align: 'right' });
+}
 function clean(v) { return typeof v === 'string' ? v.trim() : v; }
 function cleanBody(body) {
   const out = {};
@@ -220,6 +351,41 @@ async function getNextCaller() {
 function isSuperAdmin(role) { return role === 'Super Admin'; }
 function isAdminRole(role)  { return ['Super Admin', 'Admin'].includes(role); }
 function isTeamLeader(role) { return role === 'Team Leader'; }
+
+function memberMatchFilter(memberIds) {
+  if (!memberIds) return {};
+  return { $or: [{ assigned_caller_id: { $in: memberIds } }, { assigned_closer_id: { $in: memberIds } }] };
+}
+
+async function resolveReportScope(user, scopeParam) {
+  if (isAdminRole(user.role)) {
+    if (!scopeParam || scopeParam === 'company') return { label: 'Company-Wide', memberIds: null };
+    if (scopeParam.startsWith('team:')) {
+      const teamId = scopeParam.slice(5);
+      const team = await Team.findById(teamId);
+      const members = await User.find({ team_id: teamId }).select('_id');
+      return { label: team ? team.name : 'Team', memberIds: members.map(m => m._id) };
+    }
+    if (scopeParam.startsWith('user:')) {
+      const uid = scopeParam.slice(5);
+      const u = await User.findById(uid).select('full_name');
+      return { label: u ? u.full_name : 'User', memberIds: [new Types.ObjectId(uid)] };
+    }
+    return { label: 'Company-Wide', memberIds: null };
+  }
+  if (isTeamLeader(user.role)) {
+    const teamMemberIds = await getTeamMemberIds(user);
+    if (scopeParam && scopeParam.startsWith('user:')) {
+      const uid = scopeParam.slice(5);
+      if (teamMemberIds.map(String).includes(uid)) {
+        const u = await User.findById(uid).select('full_name');
+        return { label: u ? u.full_name : 'Member', memberIds: [new Types.ObjectId(uid)] };
+      }
+    }
+    return { label: 'My Team', memberIds: teamMemberIds };
+  }
+  return { label: user.name, memberIds: [new Types.ObjectId(user.userId)] };
+}
 function isManager(role)    { return ['Super Admin', 'Admin', 'Team Leader'].includes(role); } // kept for backward compat across the file
 
 // Get all Sub-TL user IDs under a Team Leader's team
@@ -437,7 +603,32 @@ app.get('/api/lead-timeline/:leadId', requireAuth, async (req, res) => {
     });
 
     const auditEvents = await AuditLog.find({ entity_id: String(leadId) }).sort('created_at').limit(20);
-    auditEvents.forEach(a => events.push({ type: 'audit', date: a.created_at, label: a.action, detail: a.user_email }));
+    auditEvents.forEach(a => {
+      let label = a.action.charAt(0).toUpperCase() + a.action.slice(1);
+      let detail = a.user_email;
+      const d = a.details || {};
+
+      if (d.quick_disposition) {
+        label = 'Marked ' + d.quick_disposition;
+        detail = a.user_email + (d.reason ? ' — Reason: ' + d.reason : '');
+      } else if (d.contact_outcome) {
+        label = 'Call outcome: ' + d.contact_outcome;
+        detail = a.user_email;
+      } else if (d.qualified) {
+        label = 'Marked Qualified';
+        detail = a.user_email;
+      } else if (a.action === 'create' && a.entity === 'Lead') {
+        return; // already shown as "Lead created" event above, skip duplicate
+      } else if (a.action === 'update' && a.entity === 'Lead') {
+        label = 'Lead details updated';
+        detail = a.user_email + (d.name ? ' — ' + d.name : '');
+      } else if (a.action === 'csv_import') {
+        label = 'Imported via CSV';
+        detail = a.user_email;
+      }
+
+      events.push({ type: 'audit', date: a.created_at, label, detail });
+    });
 
     events.sort((a, b) => new Date(a.date) - new Date(b.date));
     res.json(events);
@@ -606,6 +797,7 @@ async function handlePostAction(req) {
         project_id: objIdOrNull(body.project_id),
         budget_range: body.budget_range || '',
         status: 'New',
+        temperature: LEAD_TEMPERATURES.includes(body.temperature) ? body.temperature : undefined,
         assigned_caller_id: caller,
         assigned_closer_id: objIdOrNull(body.assigned_closer_id),
         notes: body.notes || '',
@@ -626,11 +818,21 @@ async function handlePostAction(req) {
         update.assigned_caller_id = objIdOrNull(body.assigned_caller_id);
         update.assigned_closer_id = objIdOrNull(body.assigned_closer_id);
       }
+      if (LEAD_TEMPERATURES.includes(body.temperature)) {
+        update.temperature = body.temperature;
+      } else if (body.temperature === '') {
+        update.temperature = null;
+      }
       if (body.status && LEAD_STATUSES.includes(body.status)) {
         update.status = body.status;
         const existing = await Lead.findById(body.lead_id).select('qualified_at booked_at');
         if (body.status === 'Qualified' && !existing.qualified_at) update.qualified_at = new Date();
         if (body.status === 'Booked' && !existing.booked_at) update.booked_at = new Date();
+        if (body.status === 'Not Interested' && NOT_INTERESTED_REASONS.includes(body.disposition_reason)) {
+          update.disposition_reason = body.disposition_reason;
+        } else if (body.status === 'Lost' && LOST_REASONS.includes(body.disposition_reason)) {
+          update.disposition_reason = body.disposition_reason;
+        }
       }
       await Lead.findByIdAndUpdate(body.lead_id, update);
       await audit(user.email, 'update', 'Lead', body.lead_id, { name: body.name });
@@ -642,15 +844,29 @@ async function handlePostAction(req) {
       }
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
       const update = { status: body.status };
-      //if (body.status === 'Qualified') update.qualified_at = new Date();
       const existing = await Lead.findById(body.lead_id).select('qualified_at');
       if (body.status === 'Qualified' && !existing?.qualified_at) {
         update.qualified_at = new Date();
       }
+      if (body.status === 'Qualified') update.contact_outcome = 'Interested';
+      if (body.status === 'Working') update.contact_outcome = 'Requested Callback';
+      if (body.status === 'Not Interested') {
+        update.contact_outcome = 'Not Interested';
+        if (NOT_INTERESTED_REASONS.includes(body.disposition_reason)) {
+          update.disposition_reason = body.disposition_reason;
+        }
+      }
 
       await Lead.findByIdAndUpdate(body.lead_id, update);
-      await audit(user.email, 'update', 'Lead', body.lead_id, { quick_disposition: body.status });
+      await audit(user.email, 'update', 'Lead', body.lead_id, { quick_disposition: body.status, reason: body.disposition_reason || undefined });
       return 'Lead marked ' + body.status + '.';
+    }
+    case 'quick_contact_outcome': {
+      if (!CONTACT_OUTCOMES.includes(body.contact_outcome)) throw Object.assign(new Error('Invalid outcome'), { status: 400 });
+      if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      await Lead.findByIdAndUpdate(body.lead_id, { contact_outcome: body.contact_outcome });
+      await audit(user.email, 'update', 'Lead', body.lead_id, { contact_outcome: body.contact_outcome });
+      return 'Logged: ' + body.contact_outcome + '.';
     }
     case 'qualify_lead': {
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
@@ -964,7 +1180,7 @@ async function handleDelete(req) {
 
 const ADMIN_PAGES = ['settings', 'audit'];
 const SUPERADMIN_PAGES = ['users', 'teams'];
-const MANAGER_PAGES = ['reports', 'sources'];
+const MANAGER_PAGES = ['sources'];
 
 async function appHandler(req, res) {
   try {
@@ -1078,8 +1294,27 @@ async function appHandler(req, res) {
       const to = req.query.to ? new Date(req.query.to + 'T23:59:59') : new Date();
       data.report_from = from.toISOString().slice(0, 10);
       data.report_to = to.toISOString().slice(0, 10);
-      const rangeFilter = { created_at: { $gte: from, $lte: to }, ...leadFilter };
+
+      const scopeParam = req.query.scope || '';
+      const scope = await resolveReportScope(user, scopeParam);
+      data.report_scope_label = scope.label;
+      data.report_scope_value = scopeParam || (isAdminRole(user.role) ? 'company' : (isTeamLeader(user.role) ? 'team' : 'self'));
+
+      if (isAdminRole(user.role)) {
+        data.report_teams = await Team.find().sort('name').lean();
+        const allActiveUsers = await User.find({ status: 'Active' }).select('full_name role team_id').lean();
+        data.report_teams.forEach(t => {
+          t.members = allActiveUsers.filter(u => String(u.team_id || '') === String(t._id));
+        });
+      } else if (isTeamLeader(user.role)) {
+        data.report_team_members = await User.find({ status: 'Active', team_id: user.team_id }).select('full_name role').lean();
+      }
+
+      const memberFilter = memberMatchFilter(scope.memberIds);
+      const rangeFilter = { created_at: { $gte: from, $lte: to }, ...memberFilter };
       const bookingRangeFilter = { booking_date: { $gte: from, $lte: to } };
+      const bookingScopeFilter = scope.memberIds ? { closer_id: { $in: scope.memberIds } } : {};
+
       const totalLeads = await Lead.countDocuments(rangeFilter);
       const qualified = await Lead.countDocuments({ ...rangeFilter, qualified_at: { $ne: null } });
       const booked = await Lead.countDocuments({ ...rangeFilter, status: 'Booked' });
@@ -1090,17 +1325,38 @@ async function appHandler(req, res) {
         book_rate: totalLeads ? Math.round(booked / totalLeads * 100) : 0,
         funnel
       };
+
+      const fuScopeFilter = scope.memberIds ? { assigned_to_id: { $in: scope.memberIds } } : {};
       data.followup_report = {
-        pending: await FollowUp.countDocuments({ ...fuFilter, status: 'Pending' }),
-        overdue: await FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }),
-        completed: await FollowUp.countDocuments({ ...fuFilter, status: 'Completed', completed_date: { $gte: from, $lte: to } }),
-        missed: await FollowUp.countDocuments({ ...fuFilter, status: 'Missed' })
+        pending: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Pending' }),
+        overdue: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }),
+        completed: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Completed', completed_date: { $gte: from, $lte: to } }),
+        missed: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Missed' })
       };
-      const users = isAdminRole(user.role)
-        ? await User.find({ status: 'Active' }).select('full_name role')
-        : await User.find({ status: 'Active', $or: [{ team_id: user.team_id }, { _id: userId }] }).select('full_name role');
+
+      data.source_performance = await Lead.aggregate([
+        { $match: rangeFilter },
+        { $group: {
+            _id: '$source_id', total: { $sum: 1 },
+            qualified: { $sum: { $cond: [{ $ne: ['$qualified_at', null] }, 1, 0] } },
+            booked: { $sum: { $cond: [{ $eq: ['$status', 'Booked'] }, 1, 0] } },
+            badContact: { $sum: { $cond: [{ $in: ['$contact_outcome', BAD_CONTACT_OUTCOMES] }, 1, 0] } }
+        }},
+        { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'source' } },
+        { $sort: { total: -1 } }
+      ]);
+
+      data.loss_analysis = await Lead.aggregate([
+        { $match: { ...rangeFilter, status: { $in: ['Not Interested', 'Lost'] }, disposition_reason: { $ne: null } } },
+        { $group: { _id: { status: '$status', reason: '$disposition_reason' }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } }
+      ]);
+
+      const perfUsers = scope.memberIds
+        ? await User.find({ _id: { $in: scope.memberIds }, status: 'Active' }).select('full_name role')
+        : await User.find({ status: 'Active' }).select('full_name role');
       data.performance_report = [];
-      for (const u of users) {
+      for (const u of perfUsers) {
         const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
         const qualCount = await Lead.countDocuments({ assigned_caller_id: u._id, qualified_at: { $ne: null } });
         const bookings = await Booking.aggregate([{ $match: { closer_id: u._id, ...bookingRangeFilter } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
@@ -1112,6 +1368,16 @@ async function appHandler(req, res) {
           followups: fuCount
         });
       }
+
+      const bookingAgg = await Booking.aggregate([
+        { $match: { ...bookingRangeFilter, ...bookingScopeFilter } },
+        { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }
+      ]);
+      data.booking_summary = {
+        count: bookingAgg.length ? bookingAgg[0].count : 0,
+        revenue: bookingAgg.length ? bookingAgg[0].revenue : 0,
+        avg: bookingAgg.length && bookingAgg[0].count ? Math.round(bookingAgg[0].revenue / bookingAgg[0].count) : 0
+      };
     } else if (page === 'audit') {
       data.audit_logs = await AuditLog.find().sort('-created_at').limit(150);
     }
@@ -1125,6 +1391,151 @@ async function appHandler(req, res) {
 
 app.get('/app', requireAuth, appHandler);
 app.post('/app', requireAuth, appHandler);
+
+app.get('/app/report-pdf', requireAuth, async (req, res) => {
+  try {
+    const user = req.user;
+    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const to = req.query.to ? new Date(req.query.to + 'T23:59:59') : new Date();
+    const scopeParam = req.query.scope || '';
+    const scope = await resolveReportScope(user, scopeParam);
+    const memberFilter = memberMatchFilter(scope.memberIds);
+    const rangeFilter = { created_at: { $gte: from, $lte: to }, ...memberFilter };
+    const bookingRangeFilter = { booking_date: { $gte: from, $lte: to } };
+    const bookingScopeFilter = scope.memberIds ? { closer_id: { $in: scope.memberIds } } : {};
+
+    const totalLeads = await Lead.countDocuments(rangeFilter);
+    const qualified = await Lead.countDocuments({ ...rangeFilter, qualified_at: { $ne: null } });
+    const booked = await Lead.countDocuments({ ...rangeFilter, status: 'Booked' });
+    const funnel = await Lead.aggregate([{ $match: rangeFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }, { $sort: { count: -1 } }]);
+
+    const fuScopeFilter = scope.memberIds ? { assigned_to_id: { $in: scope.memberIds } } : {};
+    const fuPending = await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Pending' });
+    const fuOverdue = await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Pending', scheduled_date: { $lt: new Date() } });
+    const fuCompleted = await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Completed', completed_date: { $gte: from, $lte: to } });
+    const fuMissed = await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Missed' });
+
+    const sourcePerf = await Lead.aggregate([
+      { $match: rangeFilter },
+      { $group: {
+          _id: '$source_id', total: { $sum: 1 },
+          qualified: { $sum: { $cond: [{ $ne: ['$qualified_at', null] }, 1, 0] } },
+          booked: { $sum: { $cond: [{ $eq: ['$status', 'Booked'] }, 1, 0] } },
+          badContact: { $sum: { $cond: [{ $in: ['$contact_outcome', BAD_CONTACT_OUTCOMES] }, 1, 0] } }
+      }},
+      { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'source' } },
+      { $sort: { total: -1 } }
+    ]);
+
+    const lossAnalysis = await Lead.aggregate([
+      { $match: { ...rangeFilter, status: { $in: ['Not Interested', 'Lost'] }, disposition_reason: { $ne: null } } },
+      { $group: { _id: { status: '$status', reason: '$disposition_reason' }, count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    const perfUsers = scope.memberIds
+      ? await User.find({ _id: { $in: scope.memberIds }, status: 'Active' }).select('full_name role')
+      : await User.find({ status: 'Active' }).select('full_name role');
+    const performance = [];
+    for (const u of perfUsers) {
+      const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
+      const qualCount = await Lead.countDocuments({ assigned_caller_id: u._id, qualified_at: { $ne: null } });
+      const bookings = await Booking.aggregate([{ $match: { closer_id: u._id, ...bookingRangeFilter } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
+      const fuCount = await FollowUp.countDocuments({ assigned_to_id: u._id });
+      performance.push({
+        name: u.full_name, role: u.role, leads: leadCount, qualified: qualCount,
+        bookings: bookings.length ? bookings[0].count : 0,
+        revenue: bookings.length ? bookings[0].revenue : 0,
+        followups: fuCount
+      });
+    }
+
+    const bookingAgg = await Booking.aggregate([
+      { $match: { ...bookingRangeFilter, ...bookingScopeFilter } },
+      { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }
+    ]);
+    const bookingSummary = {
+      count: bookingAgg.length ? bookingAgg[0].count : 0,
+      revenue: bookingAgg.length ? bookingAgg[0].revenue : 0
+    };
+
+   const settings = await getSettings();
+    const companyName = settings.company_name || 'TrueGrowth Realty';
+    const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="TrueGrowth-Report-' + Date.now() + '.pdf"');
+    doc.pipe(res);
+
+    pdfHeader(doc, companyName, scope.label, from, to);
+
+    pdfSectionHeader(doc, 'Summary');
+    pdfKpiCards(doc, [
+      { label: 'Total Leads', value: totalLeads, color: PDF_COLORS.brand },
+      { label: 'Qualified (' + (totalLeads ? Math.round(qualified/totalLeads*100) : 0) + '%)', value: qualified, color: '#0d9488' },
+      { label: 'Booked (' + (totalLeads ? Math.round(booked/totalLeads*100) : 0) + '%)', value: booked, color: PDF_COLORS.green },
+      { label: 'Revenue', value: formatMoneyPdf(bookingSummary.revenue), color: '#d97706' }
+    ]);
+
+    pdfSectionHeader(doc, 'Lead Funnel');
+    pdfTable(doc, ['Status', 'Count'], funnel.map(f => [f._id, f.count]), [340, 140],
+      { badgeColumn: 0, badgeColors: STATUS_COLORS_PDF });
+
+    pdfSectionHeader(doc, 'Source Performance');
+    pdfTable(doc,
+      ['Source', 'Leads', 'Qualified', 'Booked', 'Bad Contact %'],
+      sourcePerf.map(s => [
+        s.source[0]?.name || 'Unknown', s.total, s.qualified, s.booked,
+        (s.total ? Math.round(s.badContact / s.total * 100) : 0) + '%'
+      ]),
+      [170, 75, 75, 75, 90],
+      { colorRules: [{ col: 4, test: cell => parseInt(cell) >= 30, color: PDF_COLORS.red }] }
+    );
+
+    pdfSectionHeader(doc, 'Loss / Not Interested Reasons');
+    if (!lossAnalysis.length) {
+      doc.fontSize(9).fillColor(PDF_COLORS.gray).text('No losses recorded in this period.');
+      doc.moveDown(1);
+    } else {
+      pdfTable(doc, ['Status', 'Reason', 'Count'],
+        lossAnalysis.map(l => [l._id.status, l._id.reason, l.count]),
+        [110, 280, 90],
+        { badgeColumn: 0, badgeColors: STATUS_COLORS_PDF });
+    }
+
+    pdfSectionHeader(doc, 'Follow-Up Compliance');
+    pdfKpiCards(doc, [
+      { label: 'Pending', value: fuPending, color: PDF_COLORS.brand },
+      { label: 'Overdue', value: fuOverdue, color: PDF_COLORS.red },
+      { label: 'Completed', value: fuCompleted, color: PDF_COLORS.green },
+      { label: 'Missed', value: fuMissed, color: '#6b7280' }
+    ]);
+
+    pdfSectionHeader(doc, 'Team Performance');
+    pdfTable(doc,
+      ['Name', 'Role', 'Leads', 'Qualified', 'Bookings', 'Revenue'],
+      performance.map(p => [p.name, p.role, p.leads, p.qualified, p.bookings, formatMoneyPdf(p.revenue)]),
+      [110, 95, 55, 65, 65, 105]
+    );
+
+    pdfSectionHeader(doc, 'Booking & Revenue');
+    pdfKpiCards(doc, [
+      { label: 'Bookings', value: bookingSummary.count, color: PDF_COLORS.brand },
+      { label: 'Total Revenue', value: formatMoneyPdf(bookingSummary.revenue), color: PDF_COLORS.green },
+      { label: 'Avg Deal Size', value: formatMoneyPdf(bookingSummary.count ? Math.round(bookingSummary.revenue / bookingSummary.count) : 0), color: '#d97706' }
+    ]);
+
+    const pageRange = doc.bufferedPageRange();
+    for (let i = 0; i < pageRange.count; i++) {
+      doc.switchToPage(i);
+      pdfFooter(doc, i + 1, pageRange.count, companyName);
+    }
+
+    doc.end();
+  } catch (e) {
+    console.error('PDF report error:', e);
+    res.status(500).send('Failed to generate report PDF.');
+  }
+});
 
 // ============ CHATBOT ROUTE ============
 // ============ CHATBOT ROUTE ============

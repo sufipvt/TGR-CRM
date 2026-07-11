@@ -113,7 +113,7 @@ document.addEventListener('DOMContentLoaded', () => {
   tgRenderCharts();
 
   // Leads filters
-  ['leadSearch', 'leadStatusFilter', 'leadSourceFilter', 'leadProjectFilter'].forEach(id => {
+  ['leadSearch', 'leadStatusFilter', 'leadSourceFilter', 'leadProjectFilter', 'leadTemperatureFilter'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', filterLeads);
   });
@@ -138,30 +138,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ============================ LEADS PAGE ============================ */
 function filterLeads() {
-  const q   = (document.getElementById('leadSearch')?.value    || '').toLowerCase();
-  const st  =  document.getElementById('leadStatusFilter')?.value  || '';
-  const src =  document.getElementById('leadSourceFilter')?.value  || '';
-  const prj =  document.getElementById('leadProjectFilter')?.value || '';
+  const q    = (document.getElementById('leadSearch')?.value    || '').toLowerCase();
+  const st   =  document.getElementById('leadStatusFilter')?.value  || '';
+  const src  =  document.getElementById('leadSourceFilter')?.value  || '';
+  const prj  =  document.getElementById('leadProjectFilter')?.value || '';
+  const temp =  document.getElementById('leadTemperatureFilter')?.value || '';
 
   // Table rows
   document.querySelectorAll('#leadsTable tbody tr[data-search]').forEach(tr => {
-    const ok = (!q   || tr.dataset.search.includes(q))  &&
-               (!st  || tr.dataset.status  === st)       &&
-               (!src || tr.dataset.source  === src)      &&
-               (!prj || tr.dataset.project === prj);
+    const ok = (!q    || tr.dataset.search.includes(q))     &&
+               (!st   || tr.dataset.status  === st)          &&
+               (!src  || tr.dataset.source  === src)         &&
+               (!prj  || tr.dataset.project === prj)         &&
+               (!temp || tr.dataset.temperature === temp);
     tr.style.display = ok ? '' : 'none';
   });
 
   // Kanban cards
   document.querySelectorAll('.tg-kanban-card').forEach(card => {
-    const ok = (!q   || card.dataset.search.includes(q))  &&
-               (!st  || card.dataset.status  === st)       &&
-               (!src || card.dataset.source  === src)      &&
-               (!prj || card.dataset.project === prj);
+    const ok = (!q    || card.dataset.search.includes(q))     &&
+               (!st   || card.dataset.status  === st)          &&
+               (!src  || card.dataset.source  === src)         &&
+               (!prj  || card.dataset.project === prj)         &&
+               (!temp || card.dataset.temperature === temp);
     card.style.display = ok ? '' : 'none';
   });
 
   tgUpdateKanbanCounts();
+}
+
+const TG_NOT_INTERESTED_REASONS = ['Budget Mismatch','Location Mismatch','Timeline Mismatch (not buying soon)','Property Type Mismatch','Already Purchased Elsewhere','Other'];
+const TG_LOST_REASONS = ['Chose a Competitor Project','Price Negotiation Failed','Financing / Loan Rejected','Changed Mind','Other'];
+
+function tgToggleDispositionReason() {
+  const status = document.getElementById('lf_status')?.value;
+  const wrap = document.getElementById('lf_reason_wrap');
+  const sel = document.getElementById('lf_reason');
+  if (!wrap || !sel) return;
+  let list = null;
+  if (status === 'Not Interested') list = TG_NOT_INTERESTED_REASONS;
+  else if (status === 'Lost') list = TG_LOST_REASONS;
+
+  if (list) {
+    wrap.style.display = '';
+    const currentVal = sel.value;
+    sel.innerHTML = '<option value="">Select reason</option>' + list.map(r => `<option value="${r}">${r}</option>`).join('');
+    if (list.includes(currentVal)) sel.value = currentVal;
+  } else {
+    wrap.style.display = 'none';
+    sel.value = '';
+  }
 }
 
 function tgResetLeadForm() {
@@ -171,6 +197,7 @@ function tgResetLeadForm() {
   setVal('leadId', '');
   const title = document.getElementById('leadModalTitle');
   if (title) title.textContent = 'Add Lead';
+  tgToggleDispositionReason();
 }
 
 function tgEditLead(lead) {
@@ -184,9 +211,12 @@ function tgEditLead(lead) {
   setVal('lf_project', lead.project_id);
   setVal('lf_budget', lead.budget_range);
   setVal('lf_status', lead.status);
+  setVal('lf_temperature', lead.temperature);
   setVal('lf_caller', lead.assigned_caller_id);
   setVal('lf_closer', lead.assigned_closer_id);
   setVal('lf_notes', lead.notes);
+  tgToggleDispositionReason();
+  setVal('lf_reason', lead.disposition_reason);
   const title = document.getElementById('leadModalTitle');
   if (title) title.textContent = 'Edit Lead';
   new bootstrap.Modal(document.getElementById('leadModal')).show();
@@ -282,6 +312,35 @@ function tgCompleteFollowup(id) {
   _completeFuId = id;
   document.getElementById('completeOutcomeInput').value = '';
   new bootstrap.Modal(document.getElementById('completeModal')).show();
+}
+
+/* ===== NOT INTERESTED — REASON POPUP ===== */
+let _niLeadId = null;
+
+function tgShowNiModal(leadId, leadName) {
+  _niLeadId = leadId;
+  const nameEl = document.getElementById('niLeadName');
+  if (nameEl) nameEl.textContent = 'Lead: ' + leadName;
+  const sel = document.getElementById('niReasonSelect');
+  if (sel) sel.value = '';
+  new bootstrap.Modal(document.getElementById('niModal')).show();
+}
+
+/* ===== CONTACT OUTCOME — COULD NOT CONNECT ===== */
+let _coLeadId = null;
+
+function tgShowContactOutcomeModal(leadId, leadName) {
+  _coLeadId = leadId;
+  const nameEl = document.getElementById('coLeadName');
+  if (nameEl) nameEl.textContent = 'Lead: ' + leadName;
+  new bootstrap.Modal(document.getElementById('contactOutcomeModal')).show();
+}
+
+function tgSubmitContactOutcome(outcome) {
+  setVal('coLeadId', _coLeadId);
+  setVal('coOutcome', outcome);
+  bootstrap.Modal.getInstance(document.getElementById('contactOutcomeModal')).hide();
+  document.getElementById('coForm').submit();
 }
 
 /* ============================ BOOKINGS PAGE ============================ */
@@ -881,6 +940,18 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     if (localStorage.getItem('tgLeadView') === 'kanban') tgSetView('kanban');
   } catch(e) {}
+
+  // Not Interested confirm button
+  const confirmNiBtn = document.getElementById('confirmNiBtn');
+  if (confirmNiBtn) {
+    confirmNiBtn.addEventListener('click', () => {
+      const reason = document.getElementById('niReasonSelect').value;
+      setVal('niLeadId', _niLeadId);
+      setVal('niReason', reason);
+      bootstrap.Modal.getInstance(document.getElementById('niModal')).hide();
+      document.getElementById('niForm').submit();
+    });
+  }
 
   // Restore open/closed state
   if (sessionStorage.getItem('tgChatOpen') === '1') {

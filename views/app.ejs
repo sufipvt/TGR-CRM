@@ -30,11 +30,11 @@
   navItems.push({ page: 'leads', label: isManager ? 'Leads' : 'My Leads', icon: 'fa-user-group' });
   navItems.push({ page: 'followups', label: isManager ? 'Follow-Ups' : 'My Follow-Ups', icon: 'fa-bell' });
   navItems.push({ page: 'bookings', label: 'Bookings', icon: 'fa-file-signature' });
-  if (isManager) {
+ if (isManager) {
     navItems.push({ page: 'projects', label: 'Projects', icon: 'fa-building' });
     navItems.push({ page: 'sources', label: 'Lead Sources', icon: 'fa-bullseye' });
-    navItems.push({ page: 'reports', label: 'Reports', icon: 'fa-chart-line' });
   }
+  navItems.push({ page: 'reports', label: isManager ? 'Reports' : 'My Report', icon: 'fa-chart-line' });
   if (isSuperAdmin) {
     navItems.push({ page: 'teams', label: 'Teams', icon: 'fa-people-group' });
     navItems.push({ page: 'users', label: 'Users', icon: 'fa-users-gear' });
@@ -221,6 +221,12 @@
           <option value="">All Projects</option>
           <% data.projects.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %>
         </select>
+        <select id="leadTemperatureFilter" class="form-select" style="max-width:160px;" aria-label="Filter by temperature">
+          <option value="">All Temperatures</option>
+          <option value="Hot">🔥 Hot</option>
+          <option value="Warm">☀️ Warm</option>
+          <option value="Cold">❄️ Cold</option>
+        </select>
         <div class="ms-auto d-flex gap-2">
           <div class="btn-group" role="group" aria-label="View toggle">
             <button id="tgViewTable" type="button" class="btn btn-sm btn-primary"
@@ -243,7 +249,7 @@
       <div class="table-responsive">
         <table class="table tg-table align-middle" id="leadsTable">
           <thead>
-            <tr><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+            <tr><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Temp</th><th>Status</th><th>Created</th><th>Actions</th></tr>
           </thead>
           <tbody>
             <% if (!data.leads.length) { %>
@@ -253,31 +259,42 @@
               <%
                 const canEdit = isManager || String(lead.assigned_caller_id?._id || '') === user.userId || String(lead.assigned_closer_id?._id || '') === user.userId;
               %>
-              <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+             <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+                  data-temperature="<%= lead.temperature || '' %>"
                   data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
                 <td>
                   <div class="fw-medium"><%= lead.name %></div>
                   <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
                 </td>
-                <td><%= lead.phone %></td>
+                <td>
+                  <%= lead.phone %>
+                  <% if (['Not Reachable','Switched Off','Call Rejected','Invalid Number'].includes(lead.contact_outcome)) { %>
+                    <i class="fa-solid fa-phone-slash text-danger ms-1" title="<%= lead.contact_outcome %>" aria-hidden="true"></i>
+                  <% } %>
+                </td>
+      
                 <td><%= lead.source_id ? lead.source_id.name : '—' %></td>
                 <td><%= lead.project_id ? lead.project_id.name : '—' %></td>
                 <td><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
-                <td><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
+               <td><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
+                <td>
+                  <% if (lead.temperature === 'Hot') { %><span class="badge text-bg-danger">🔥 Hot</span><% } %>
+                  <% if (lead.temperature === 'Warm') { %><span class="badge text-bg-warning">☀️ Warm</span><% } %>
+                  <% if (lead.temperature === 'Cold') { %><span class="badge text-bg-info">❄️ Cold</span><% } %>
+                  <% if (!lead.temperature) { %><span class="text-secondary">—</span><% } %>
+                </td>
                 <td><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
                 <td class="text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
                 <td class="text-nowrap">
                   <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
                      href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
                      title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
-                  <button class="btn btn-sm btn-outline-secondary" onclick="tgShowTimeline('<%= lead._id %>', <%- JSON.stringify(lead.name) %>)" title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
                   <% if (canEdit) { %>
-                    <form method="POST" action="/app?page=leads" style="display:inline">
-                      <input type="hidden" name="action" value="quick_disposition">
-                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
-                      <input type="hidden" name="status" value="Not Interested">
-                      <button type="submit" class="btn btn-sm btn-outline-danger" title="Not Interested">NI</button>
-                    </form>
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Not Interested"
+                      onclick='tgShowNiModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'>NI</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Could not connect" aria-label="Log contact attempt"
+                      onclick='tgShowContactOutcomeModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'><i class="fa-solid fa-phone-slash" aria-hidden="true"></i></button>
                     <form method="POST" action="/app?page=leads" style="display:inline">
                       <input type="hidden" name="action" value="quick_disposition">
                       <input type="hidden" name="lead_id" value="<%= lead._id %>">
@@ -291,14 +308,15 @@
                       <button type="submit" class="btn btn-sm btn-outline-success" title="Interested / Qualified">INT</button>
                     </form>
                     <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead"
-                      onclick='tgEditLead(<%- JSON.stringify({
-                        _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
-                        source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
-                        budget_range: lead.budget_range || "", status: lead.status,
-                        assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
-                        assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
-                        notes: lead.notes || ""
-                      }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                    onclick='tgEditLead(<%- JSON.stringify({
+                      _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
+                      source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
+                      budget_range: lead.budget_range || "", status: lead.status,
+                      temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
+                      assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
+                      assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
+                      notes: lead.notes || ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <% } %>
                   <% if (isManager) { %>
                     <a class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"
@@ -340,23 +358,30 @@
                   const ageDays = Math.floor((Date.now() - new Date(lead.created_at)) / 86400000);
                 %>
                   <div class="tg-kanban-card <%= ageDays >= 7 ? 'tg-kanban-stale' : '' %>"
-                       draggable="<%= canEditCard ? 'true' : 'false' %>"
-                       data-id="<%= lead._id %>"
-                       data-status="<%= lead.status %>"
-                       data-source="<%= lead.source_id ? lead.source_id.name : '' %>"
-                       data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
-                       data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>"
+                     draggable="<%= canEditCard ? 'true' : 'false' %>"
+                     data-id="<%= lead._id %>"
+                     data-status="<%= lead.status %>"
+                     data-source="<%= lead.source_id ? lead.source_id.name : '' %>"
+                     data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+                     data-temperature="<%= lead.temperature || '' %>"
+                     data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>"
                        ondragstart="tgKanbanDragStart(event)"
                        ondragend="this.classList.remove('dragging')">
                     <div class="fw-semibold" style="font-size:13px;">
-                      <%= lead.name %>
-                      <% if (ageDays >= 7) { %>
-                        <span style="color:#f59e0b;" title="<%= ageDays %> days old">⚠</span>
-                      <% } %>
-                    </div>
+                    <%= lead.name %>
+                    <% if (lead.temperature === 'Hot') { %><i class="fa-solid fa-fire text-danger" title="Hot lead" aria-hidden="true"></i><% } %>
+                    <% if (lead.temperature === 'Warm') { %><i class="fa-solid fa-sun text-warning" title="Warm lead" aria-hidden="true"></i><% } %>
+                    <% if (lead.temperature === 'Cold') { %><i class="fa-solid fa-snowflake text-info" title="Cold lead" aria-hidden="true"></i><% } %>
+                    <% if (ageDays >= 7) { %>
+                      <span style="color:#f59e0b;" title="<%= ageDays %> days old">⚠</span>
+                    <% } %>
+                  </div>
                     <div style="font-size:12px; color:#6b7280; margin-top:2px;">
-                      <i class="fa-solid fa-phone" style="font-size:9px;" aria-hidden="true"></i> <%= lead.phone %>
-                    </div>
+                    <i class="fa-solid fa-phone" style="font-size:9px;" aria-hidden="true"></i> <%= lead.phone %>
+                    <% if (['Not Reachable','Switched Off','Call Rejected','Invalid Number'].includes(lead.contact_outcome)) { %>
+                      <i class="fa-solid fa-phone-slash text-danger ms-1" style="font-size:9px;" title="<%= lead.contact_outcome %>" aria-hidden="true"></i>
+                    <% } %>
+                  </div>
                     <% if (lead.project_id) { %>
                       <div style="font-size:11px; color:var(--brand); margin-top:4px;">
                         <i class="fa-solid fa-building" style="font-size:9px;" aria-hidden="true"></i>
@@ -382,6 +407,7 @@
                             source_id: lead.source_id ? String(lead.source_id._id) : "",
                             project_id: lead.project_id ? String(lead.project_id._id) : "",
                             budget_range: lead.budget_range || "", status: lead.status,
+                            temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
                             assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
                             assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
                             notes: lead.notes || ""
@@ -455,9 +481,25 @@
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="lf_status">Status</label>
-                  <select class="form-select" id="lf_status" name="status">
+                  <select class="form-select" id="lf_status" name="status" onchange="tgToggleDispositionReason()">
                     <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
                   </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_temperature">Temperature</label>
+                  <select class="form-select" id="lf_temperature" name="temperature">
+                    <option value="">Not set</option>
+                    <option value="Hot">🔥 Hot</option>
+                    <option value="Warm">☀️ Warm</option>
+                    <option value="Cold">❄️ Cold</option>
+                  </select>
+                </div>
+                <div class="col-12" id="lf_reason_wrap" style="display:none;">
+                  <label class="form-label" for="lf_reason">Reason</label>
+                  <select class="form-select" id="lf_reason" name="disposition_reason">
+                    <option value="">Select reason</option>
+                  </select>
+                  <div class="text-secondary mt-1" style="font-size:12px;">Shown for Not Interested / Lost — feeds the Loss Analysis report.</div>
                 </div>
                 <% if (isManager) { %>
                   <div class="col-md-6">
@@ -587,6 +629,67 @@
         <p class="text-secondary">Loading…</p>
       </div>
     </div>
+
+    <!-- Not Interested Reason Modal -->
+    <div class="modal fade" id="niModal" tabindex="-1" aria-labelledby="niModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="niModalTitle">Mark Not Interested</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="fw-medium mb-3" id="niLeadName" style="font-size:14px;"></p>
+            <label class="form-label" for="niReasonSelect">Reason</label>
+            <select class="form-select" id="niReasonSelect">
+              <option value="">Select reason (optional)</option>
+              <% ['Budget Mismatch','Location Mismatch','Timeline Mismatch (not buying soon)','Property Type Mismatch','Already Purchased Elsewhere','Other'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirmNiBtn"><i class="fa-solid fa-ban me-1" aria-hidden="true"></i>Mark Not Interested</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden form for NI submission -->
+    <form method="POST" action="/app?page=leads" id="niForm" class="d-none">
+      <input type="hidden" name="action" value="quick_disposition">
+      <input type="hidden" name="lead_id" id="niLeadId">
+      <input type="hidden" name="status" value="Not Interested">
+      <input type="hidden" name="disposition_reason" id="niReason">
+    </form>
+
+    <!-- Contact Outcome Modal -->
+    <div class="modal fade" id="contactOutcomeModal" tabindex="-1" aria-labelledby="contactOutcomeModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="contactOutcomeModalTitle">Log Contact Attempt</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="fw-medium mb-3" id="coLeadName" style="font-size:14px;"></p>
+            <div class="d-flex flex-column gap-2">
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Not Reachable')"><i class="fa-solid fa-phone-slash me-2" aria-hidden="true"></i>Not Reachable</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Switched Off')"><i class="fa-solid fa-power-off me-2" aria-hidden="true"></i>Switched Off</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Call Rejected')"><i class="fa-solid fa-phone-slash me-2" aria-hidden="true"></i>Call Rejected / Cut</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Invalid Number')"><i class="fa-solid fa-triangle-exclamation me-2" aria-hidden="true"></i>Invalid Number</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form method="POST" action="/app?page=leads" id="coForm" class="d-none">
+      <input type="hidden" name="action" value="quick_contact_outcome">
+      <input type="hidden" name="lead_id" id="coLeadId">
+      <input type="hidden" name="contact_outcome" id="coOutcome">
+    </form>
 
   <%# ======================= FOLLOW-UPS ======================= %>
   <% } else if (page === 'followups') { %>
@@ -1277,13 +1380,43 @@
   <%# ======================= REPORTS ======================= %>
   <% } else if (page === 'reports') { %>
     <div class="tg-panel mb-3">
-      <h2 class="tg-panel-title">Lead Conversion</h2>
-      <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+      <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-end">
         <input type="hidden" name="page" value="reports">
         <div><label class="form-label mb-1" for="rp_from" style="font-size:13px;">From</label><input type="date" class="form-control" id="rp_from" name="from" value="<%= data.report_from %>"></div>
         <div><label class="form-label mb-1" for="rp_to" style="font-size:13px;">To</label><input type="date" class="form-control" id="rp_to" name="to" value="<%= data.report_to %>"></div>
+        <% if (isManager) { %>
+        <div>
+          <label class="form-label mb-1" for="rp_scope" style="font-size:13px;">Viewing</label>
+          <select class="form-select" id="rp_scope" name="scope">
+            <% if (isAdminRole) { %>
+              <option value="company" <%= data.report_scope_value === 'company' ? 'selected' : '' %>>Company-Wide</option>
+              <% (data.report_teams || []).forEach(t => { %>
+                <optgroup label="<%= t.name %>">
+                  <option value="team:<%= t._id %>" <%= data.report_scope_value === 'team:' + t._id ? 'selected' : '' %>>Whole Team — <%= t.name %></option>
+                  <% t.members.forEach(m => { %>
+                    <option value="user:<%= m._id %>" <%= data.report_scope_value === 'user:' + m._id ? 'selected' : '' %>><%= m.full_name %> (<%= m.role %>)</option>
+                  <% }) %>
+                </optgroup>
+              <% }) %>
+            <% } else { %>
+              <option value="team" <%= data.report_scope_value === 'team' ? 'selected' : '' %>>My Whole Team</option>
+              <% (data.report_team_members || []).forEach(m => { %>
+                <option value="user:<%= m._id %>" <%= data.report_scope_value === 'user:' + m._id ? 'selected' : '' %>><%= m.full_name %> (<%= m.role %>)</option>
+              <% }) %>
+            <% } %>
+          </select>
+        </div>
+        <% } %>
         <button type="submit" class="btn btn-primary">Run</button>
+        <a class="btn btn-outline-secondary" href="/app/report-pdf?from=<%= data.report_from %>&to=<%= data.report_to %>&scope=<%= data.report_scope_value %>" target="_blank" rel="noopener">
+          <i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download PDF
+        </a>
       </form>
+      <div class="text-secondary mt-2" style="font-size:13px;">Viewing: <strong><%= data.report_scope_label %></strong></div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Lead Conversion</h2>
       <div class="row g-3 mb-3">
         <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.total %></div><div class="tg-mini-label">Total Leads</div></div></div>
         <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.qualified %></div><div class="tg-mini-label">Qualified (<%= data.conversion_report.qual_rate %>%)</div></div></div>
@@ -1303,6 +1436,53 @@
     </div>
 
     <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Source Performance</h2>
+      <p class="text-secondary" style="font-size:13px;">Which lead sources convert well, and which give bad contact data.</p>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0">
+          <thead><tr><th>Source</th><th>Leads</th><th>Qualified</th><th>Booked</th><th>Bad Contact %</th></tr></thead>
+          <tbody>
+            <% if (!data.source_performance.length) { %>
+              <tr><td colspan="5" class="text-secondary text-center py-3">No leads in this period.</td></tr>
+            <% } %>
+            <% data.source_performance.forEach(s => { %>
+              <% const badPct = s.total ? Math.round(s.badContact / s.total * 100) : 0; %>
+              <tr>
+                <td class="fw-medium"><%= s.source[0] ? s.source[0].name : 'Unknown' %></td>
+                <td><%= s.total %></td>
+                <td><%= s.qualified %></td>
+                <td><%= s.booked %></td>
+                <td><span class="<%= badPct >= 30 ? 'text-danger fw-medium' : 'text-secondary' %>"><%= badPct %>%</span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Loss / Not Interested Reasons</h2>
+      <p class="text-secondary" style="font-size:13px;">Why leads are being lost — helps spot pricing, project, or process issues.</p>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0">
+          <thead><tr><th>Status</th><th>Reason</th><th>Count</th></tr></thead>
+          <tbody>
+            <% if (!data.loss_analysis.length) { %>
+              <tr><td colspan="3" class="text-secondary text-center py-3">No losses recorded in this period.</td></tr>
+            <% } %>
+            <% data.loss_analysis.forEach(l => { %>
+              <tr>
+                <td><span class="badge text-bg-<%= statusColors[l._id.status] || 'secondary' %>"><%= l._id.status %></span></td>
+                <td><%= l._id.reason %></td>
+                <td><%= l.count %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
       <h2 class="tg-panel-title">Follow-Up Summary</h2>
       <div class="row g-3">
         <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.pending %></div><div class="tg-mini-label">Pending</div></div></div>
@@ -1312,8 +1492,8 @@
       </div>
     </div>
 
-    <div class="tg-panel">
-      <h2 class="tg-panel-title">User Performance</h2>
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Team Performance</h2>
       <div class="table-responsive">
         <table class="table tg-table mb-0">
           <thead><tr><th>Name</th><th>Role</th><th>Leads</th><th>Qualified</th><th>Bookings</th><th>Revenue</th><th>Follow-Ups</th></tr></thead>
@@ -1331,6 +1511,15 @@
             <% }) %>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <div class="tg-panel">
+      <h2 class="tg-panel-title">Booking &amp; Revenue</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.booking_summary.count %></div><div class="tg-mini-label">Bookings</div></div></div>
+        <div class="col-6 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= formatMoney(data.booking_summary.revenue) %></div><div class="tg-mini-label">Total Revenue</div></div></div>
+        <div class="col-12 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= formatMoney(data.booking_summary.avg) %></div><div class="tg-mini-label">Avg Deal Size</div></div></div>
       </div>
     </div>
 
