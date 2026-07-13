@@ -21,6 +21,7 @@ const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const path = require('path');
 const PDFDocument = require('pdfkit');
+const compression = require('compression');
 
 // ---------------------------------------------------------------------------
 // ENV VALIDATION
@@ -54,7 +55,7 @@ const User = mongoose.model('User', new Schema({
   email:     { type: String, required: true, unique: true, lowercase: true },
   password:  { type: String, required: true },
   role:      { type: String, enum: USER_ROLES, required: true },
-  team_id:   { type: Schema.Types.ObjectId, ref: 'Team' },
+  team_id:   { type: Schema.Types.ObjectId, ref: 'Team', index: true },
   phone:     String,
   status:    { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
   created_at:{ type: Date, default: Date.now }
@@ -126,8 +127,8 @@ const Lead = mongoose.model('Lead', new Schema({
   temperature:        { type: String, enum: LEAD_TEMPERATURES },
   contact_outcome:    { type: String, enum: CONTACT_OUTCOMES },
   disposition_reason: { type: String, enum: DISPOSITION_REASONS },
-  assigned_caller_id: { type: Schema.Types.ObjectId, ref: 'User' },
-  assigned_closer_id: { type: Schema.Types.ObjectId, ref: 'User' },
+  assigned_caller_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+  assigned_closer_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   notes:              String,
   created_at:         { type: Date, default: Date.now },
   qualified_at:       Date,
@@ -136,7 +137,7 @@ const Lead = mongoose.model('Lead', new Schema({
 
 const FollowUp = mongoose.model('FollowUp', new Schema({
   lead_id:        { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
-  assigned_to_id: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  assigned_to_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   scheduled_date: { type: Date, required: true },
   completed_date: Date,
   type:           { type: String, enum: ['Call', 'WhatsApp', 'Site Visit', 'Meeting', 'Email', 'Other'], default: 'Call' },
@@ -150,7 +151,7 @@ const Booking = mongoose.model('Booking', new Schema({
   lead_id:        { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
   project_id:     { type: Schema.Types.ObjectId, ref: 'Project', required: true },
   unit_id:        { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
-  closer_id:      { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  closer_id:      { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   booking_date:   { type: Date, default: Date.now },
   sale_value:     { type: Number, default: 0 },
   booking_amount: { type: Number, required: true },
@@ -352,6 +353,51 @@ function isSuperAdmin(role) { return role === 'Super Admin'; }
 function isAdminRole(role)  { return ['Super Admin', 'Admin'].includes(role); }
 function isTeamLeader(role) { return role === 'Team Leader'; }
 
+function isTeamLeader(role) { return role === 'Team Leader'; }
+
+// Replaces an N-users x 4-queries loop with 3 fixed queries total, regardless of team size.
+async function buildPerformanceReport(perfUsers, bookingRangeFilter) {
+  const userIds = perfUsers.map(u => u._id);
+
+  const relevantLeads = await Lead.find({
+    $or: [{ assigned_caller_id: { $in: userIds } }, { assigned_closer_id: { $in: userIds } }]
+  }).select('assigned_caller_id assigned_closer_id qualified_at').lean();
+
+  const bookingAgg = await Booking.aggregate([
+    { $match: { ...bookingRangeFilter, closer_id: { $in: userIds } } },
+    { $group: { _id: '$closer_id', count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }
+  ]);
+  const bookingMap = {};
+  bookingAgg.forEach(b => { bookingMap[String(b._id)] = b; });
+
+  const fuAgg = await FollowUp.aggregate([
+    { $match: { assigned_to_id: { $in: userIds } } },
+    { $group: { _id: '$assigned_to_id', count: { $sum: 1 } } }
+  ]);
+  const fuMap = {};
+  fuAgg.forEach(f => { fuMap[String(f._id)] = f.count; });
+
+  return perfUsers.map(u => {
+    const uid = String(u._id);
+    let leads = 0, qualified = 0;
+    relevantLeads.forEach(l => {
+      const isCaller = String(l.assigned_caller_id || '') === uid;
+      const isCloser = String(l.assigned_closer_id || '') === uid;
+      if (isCaller || isCloser) {
+        leads++;
+        if (isCaller && l.qualified_at) qualified++;
+      }
+    });
+    const b = bookingMap[uid];
+    return {
+      name: u.full_name, role: u.role, leads, qualified,
+      bookings: b ? b.count : 0,
+      revenue: b ? b.revenue : 0,
+      followups: fuMap[uid] || 0
+    };
+  });
+}
+
 function memberMatchFilter(memberIds) {
   if (!memberIds) return {};
   return { $or: [{ assigned_caller_id: { $in: memberIds } }, { assigned_closer_id: { $in: memberIds } }] };
@@ -470,13 +516,14 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
+app.use(compression());
 app.use(helmet({
-  contentSecurityPolicy: false // Bootstrap/FontAwesome/Chart.js CDNs + inline scripts in EJS
+  contentSecurityPolicy: false
 }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
@@ -1355,19 +1402,7 @@ async function appHandler(req, res) {
       const perfUsers = scope.memberIds
         ? await User.find({ _id: { $in: scope.memberIds }, status: 'Active' }).select('full_name role')
         : await User.find({ status: 'Active' }).select('full_name role');
-      data.performance_report = [];
-      for (const u of perfUsers) {
-        const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
-        const qualCount = await Lead.countDocuments({ assigned_caller_id: u._id, qualified_at: { $ne: null } });
-        const bookings = await Booking.aggregate([{ $match: { closer_id: u._id, ...bookingRangeFilter } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
-        const fuCount = await FollowUp.countDocuments({ assigned_to_id: u._id });
-        data.performance_report.push({
-          name: u.full_name, role: u.role, leads: leadCount, qualified: qualCount,
-          bookings: bookings.length ? bookings[0].count : 0,
-          revenue: bookings.length ? bookings[0].revenue : 0,
-          followups: fuCount
-        });
-      }
+      data.performance_report = await buildPerformanceReport(perfUsers, bookingRangeFilter);
 
       const bookingAgg = await Booking.aggregate([
         { $match: { ...bookingRangeFilter, ...bookingScopeFilter } },
@@ -1436,19 +1471,7 @@ app.get('/app/report-pdf', requireAuth, async (req, res) => {
     const perfUsers = scope.memberIds
       ? await User.find({ _id: { $in: scope.memberIds }, status: 'Active' }).select('full_name role')
       : await User.find({ status: 'Active' }).select('full_name role');
-    const performance = [];
-    for (const u of perfUsers) {
-      const leadCount = await Lead.countDocuments({ $or: [{ assigned_caller_id: u._id }, { assigned_closer_id: u._id }] });
-      const qualCount = await Lead.countDocuments({ assigned_caller_id: u._id, qualified_at: { $ne: null } });
-      const bookings = await Booking.aggregate([{ $match: { closer_id: u._id, ...bookingRangeFilter } }, { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }]);
-      const fuCount = await FollowUp.countDocuments({ assigned_to_id: u._id });
-      performance.push({
-        name: u.full_name, role: u.role, leads: leadCount, qualified: qualCount,
-        bookings: bookings.length ? bookings[0].count : 0,
-        revenue: bookings.length ? bookings[0].revenue : 0,
-        followups: fuCount
-      });
-    }
+    const performance = await buildPerformanceReport(perfUsers, bookingRangeFilter);
 
     const bookingAgg = await Booking.aggregate([
       { $match: { ...bookingRangeFilter, ...bookingScopeFilter } },
