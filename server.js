@@ -43,6 +43,18 @@ if (!process.env.SENDGRID_API_KEY) {
 const PORT = process.env.PORT || 3000;
 const IS_PROD = process.env.NODE_ENV === 'production';
 
+// If something truly unexpected slips through every try/catch, log it clearly and
+// exit deliberately rather than keep running in a possibly-corrupted state.
+// Render's platform automatically restarts the service within seconds.
+process.on('uncaughtException', (err) => {
+  console.error('FATAL \u2014 Uncaught Exception:', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('FATAL \u2014 Unhandled Promise Rejection:', reason);
+  process.exit(1);
+});
+
 // ---------------------------------------------------------------------------
 // MODELS
 // ---------------------------------------------------------------------------
@@ -203,6 +215,25 @@ function formatDateTime(d) {
   if (!d) return '\u2014';
   return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+function sendErrorPage(res, status, message) {
+  res.status(status).send(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>TrueGrowth CRM</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f8fafc; color:#111827; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
+  .box { text-align:center; padding:40px; max-width:420px; }
+  .icon { font-size:48px; margin-bottom:16px; }
+  h1 { font-size:20px; margin:0 0 8px; }
+  p { color:#6b7280; font-size:14px; margin:0 0 24px; }
+  a { display:inline-block; background:#1a56db; color:#fff; text-decoration:none; padding:10px 22px; border-radius:8px; font-size:14px; font-weight:600; }
+</style></head>
+<body><div class="box">
+  <div class="icon">\u26A0\uFE0F</div>
+  <h1>Something went wrong</h1>
+  <p>${message}</p>
+  <a href="/app">Return to Dashboard</a>
+</div></body></html>`);
+}
+
 function formatMoneyPdf(n) {
   return 'Rs. ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 }
@@ -509,6 +540,45 @@ function requireSuperAdmin(req, res, next) {
   next();
 }
 
+// Short-lived cache so we don't hit the DB on every request, while still
+// catching deactivation/role changes within seconds instead of up to 8 hours.
+const userContextCache = new Map();
+const USER_CACHE_TTL = 30 * 1000;
+
+async function refreshUserContext(req, res, next) {
+  try {
+    const uid = req.user.userId;
+    const cached = userContextCache.get(uid);
+    const now = Date.now();
+
+    if (cached && cached.expires > now) {
+      if (cached.data === null) {
+        res.clearCookie('tg_token');
+        return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
+      }
+      Object.assign(req.user, cached.data);
+      return next();
+    }
+
+    const dbUser = await User.findById(uid).select('role team_id status full_name');
+    if (!dbUser || dbUser.status !== 'Active') {
+      userContextCache.set(uid, { data: null, expires: now + USER_CACHE_TTL });
+      res.clearCookie('tg_token');
+      return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
+    }
+
+    const fresh = { role: dbUser.role, team_id: dbUser.team_id, name: dbUser.full_name };
+    userContextCache.set(uid, { data: fresh, expires: now + USER_CACHE_TTL });
+    Object.assign(req.user, fresh);
+    next();
+  } catch (e) {
+    // Fail OPEN on a transient DB hiccup — the signed JWT is still valid,
+    // and locking everyone out due to a momentary blip would hurt availability more than it helps security.
+    console.error('refreshUserContext error (failing open):', e.message);
+    next();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // APP SETUP
 // ---------------------------------------------------------------------------
@@ -520,8 +590,8 @@ app.use(compression());
 app.use(helmet({
   contentSecurityPolicy: false
 }));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
@@ -535,6 +605,33 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many login attempts. Please try again in 15 minutes.'
+});
+
+// Chatbot — cost-sensitive (calls Groq API), stricter window
+const chatLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { reply: "You're sending messages a bit fast \u2014 please wait a moment and try again." }
+});
+
+// Heavy operations — PDF generation, CSV import (multiple DB aggregations / file parsing)
+const expensiveOpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests for this action. Please wait a few minutes and try again.'
+});
+
+// General authenticated app traffic — generous ceiling, well above normal multi-page navigation
+const appActionLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 400,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests. Please slow down and try again shortly.'
 });
 
 const upload = multer({
@@ -587,7 +684,7 @@ app.get('/logout', (req, res) => {
   res.redirect('/login');
 });
 
-app.patch('/api/lead/:id/status', requireAuth, async (req, res) => {
+app.patch('/api/lead/:id/status', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
   try {
     const { status } = req.body;
     if (!LEAD_STATUSES.includes(status))
@@ -610,14 +707,14 @@ app.patch('/api/lead/:id/status', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 // API ROUTES
 // ---------------------------------------------------------------------------
-app.get('/api/units/:projectId', requireAuth, async (req, res) => {
+app.get('/api/units/:projectId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
   try {
     const units = await Unit.find({ project_id: req.params.projectId, status: 'Available' }).sort('unit_number');
     res.json(units);
   } catch (e) { res.status(500).json({ error: 'Failed to load units' }); }
 });
 
-app.get('/api/lead-timeline/:leadId', requireAuth, async (req, res) => {
+app.get('/api/lead-timeline/:leadId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
   try {
     const { leadId } = req.params;
     const lead = await Lead.findById(leadId).populate('source_id project_id assigned_caller_id assigned_closer_id');
@@ -688,7 +785,7 @@ app.get('/api/lead-timeline/:leadId', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 // RECEIPT
 // ---------------------------------------------------------------------------
-app.get('/app/receipt/:bookingId', requireAuth, async (req, res) => {
+app.get('/app/receipt/:bookingId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.bookingId).populate('lead_id project_id unit_id closer_id');
     if (!booking) return res.status(404).send('Booking not found');
@@ -704,7 +801,7 @@ app.get('/app/receipt/:bookingId', requireAuth, async (req, res) => {
     res.render('receipt', { booking, payments, amount_paid, settings });
   } catch (e) {
     console.error('Receipt error:', e);
-    res.status(500).send('An error occurred.');
+    sendErrorPage(res, 500, 'We couldn\u2019t load this receipt. Please try again.');
   }
 });
 
@@ -713,7 +810,7 @@ app.get('/app/receipt/:bookingId', requireAuth, async (req, res) => {
 // ---------------------------------------------------------------------------
 function escapeRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
-app.post('/app/import-leads', requireAuth, requireAdmin, (req, res) => {
+app.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserContext, requireAdmin, (req, res) => {
   upload.single('csv_file')(req, res, async (err) => {
     if (err) return res.redirect('/app?page=leads&msg=' + encodeURIComponent('Upload failed: ' + err.message));
     if (!req.file) return res.redirect('/app?page=leads&msg=' + encodeURIComponent('No file uploaded.'));
@@ -1000,6 +1097,7 @@ async function handlePostAction(req) {
       };
       if (body.password) update.password = await bcrypt.hash(body.password, 12);
       await User.findByIdAndUpdate(body.user_id, update);
+      userContextCache.delete(String(body.user_id));
       await audit(user.email, 'update', 'User', body.user_id, { email: body.email });
       return 'User updated.';
     }
@@ -1177,6 +1275,7 @@ async function handleDelete(req) {
       if (!isSuperAdmin(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
       if (String(id) === String(user.userId)) throw Object.assign(new Error('Cannot delete yourself'), { status: 400 });
       await User.findByIdAndDelete(id);
+      userContextCache.delete(String(id));
       await audit(user.email, 'delete', 'User', id, {});
       break;
     }
@@ -1420,14 +1519,14 @@ async function appHandler(req, res) {
     res.render('app', { page, user, data, success_msg });
   } catch (e) {
     console.error('appHandler error:', e);
-    res.status(500).send('An error occurred.');
+    sendErrorPage(res, 500, 'We hit an unexpected error loading this page. Please try again, and contact support if it continues.');
   }
 }
 
-app.get('/app', requireAuth, appHandler);
-app.post('/app', requireAuth, appHandler);
+app.get('/app', requireAuth, appActionLimiter, refreshUserContext, appHandler);
+app.post('/app', requireAuth, appActionLimiter, refreshUserContext, appHandler);
 
-app.get('/app/report-pdf', requireAuth, async (req, res) => {
+app.get('/app/report-pdf', requireAuth, expensiveOpLimiter, refreshUserContext, async (req, res) => {
   try {
     const user = req.user;
     const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -1562,7 +1661,7 @@ app.get('/app/report-pdf', requireAuth, async (req, res) => {
 
 // ============ CHATBOT ROUTE ============
 // ============ CHATBOT ROUTE ============
-app.post('/api/chat', requireAuth, async (req, res) => {
+app.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (req, res) => {
   try {
     const { message, history = [] } = req.body;
     const user = await User.findById(req.user.userId);
@@ -1800,7 +1899,17 @@ function isAdminOrMD(user) {
 }
 
 // 404 catch-all
-app.use((req, res) => res.status(404).send('Route Not Found: ' + req.method + ' ' + req.url));
+app.use((req, res) => {
+  console.log('404:', req.method, req.url);
+  sendErrorPage(res, 404, 'The page you\u2019re looking for doesn\u2019t exist.');
+});
+
+// Global error handler \u2014 catches anything that slips past every route's own try/catch
+app.use((err, req, res, next) => {
+  console.error('Unhandled route error:', err);
+  if (res.headersSent) return next(err);
+  sendErrorPage(res, 500, 'Something went wrong on our end. Please try again.');
+});
 
 // ---------------------------------------------------------------------------
 // DAILY EMAIL DIGEST
