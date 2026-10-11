@@ -9,14 +9,15 @@
 // Safe to re-run: each follow-up is marked tz_fixed and never shifted twice.
 // Follow-ups created after the switch are already correct and are skipped.
 //
-// Usage (run right after the IST deploy is live):
-//   node migrations/2026-10-ist-followup-times.js --before 2026-10-12T10:00:00Z          # dry run
-//   node migrations/2026-10-ist-followup-times.js --before 2026-10-12T10:00:00Z --apply  # write
-// --before: the moment the IST deploy went live (from Render's deploy log), in UTC.
+// Same fix as the Super Admin button on the Settings page (services/istFollowupFix.js).
+// Usage:
+//   node migrations/2026-10-ist-followup-times.js            # dry run
+//   node migrations/2026-10-ist-followup-times.js --apply    # write
+//   --before <ISO time> overrides the switch time.
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.development.local') });
 const mongoose = require('mongoose');
-
-const SHIFT_MS = 5.5 * 60 * 60 * 1000;
+const { FollowUp } = require('../models');
+const { IST_SWITCH_AT, SHIFT_MS, countUnfixedFollowUps, fixFollowUpTimes } = require('../services/istFollowupFix');
 
 function arg(name) {
   const i = process.argv.indexOf(name);
@@ -26,34 +27,24 @@ function arg(name) {
 async function main() {
   const beforeArg = arg('--before');
   const apply = process.argv.includes('--apply');
-  const before = new Date(beforeArg);
-  if (!beforeArg || isNaN(before)) {
-    console.error('Pass --before <ISO time the IST deploy went live>, e.g. --before 2026-10-12T10:00:00Z');
+  const before = beforeArg ? new Date(beforeArg) : IST_SWITCH_AT;
+  if (isNaN(before)) {
+    console.error('--before must be an ISO time, e.g. --before 2026-10-11T17:41:46Z');
     process.exit(1);
   }
   if (!process.env.MONGODB_URI) { console.error('MONGODB_URI is not set'); process.exit(1); }
 
   await mongoose.connect(process.env.MONGODB_URI);
-  const followups = mongoose.connection.db.collection('followups');
-  const filter = { created_at: { $lt: before }, tz_fixed: { $ne: true } };
-
-  const count = await followups.countDocuments(filter);
-  const sample = await followups.find(filter).sort({ scheduled_date: -1 }).limit(3).toArray();
+  const count = await countUnfixedFollowUps(before);
+  const sample = await FollowUp.collection.find({ created_at: { $lt: before }, tz_fixed: { $ne: true } })
+    .sort({ scheduled_date: -1 }).limit(3).toArray();
   console.log(`Follow-ups created before ${before.toISOString()} and not yet fixed: ${count}`);
   sample.forEach(f => console.log(`  ${f._id}  ${f.scheduled_date.toISOString()}  ->  ${new Date(f.scheduled_date.getTime() - SHIFT_MS).toISOString()}`));
 
   if (!apply) {
     console.log('\nDry run only. Re-run with --apply to write.');
   } else {
-    let shifted = 0;
-    for await (const f of followups.find(filter).project({ scheduled_date: 1 })) {
-      // tz_fixed in the filter makes each write a no-op if this ever runs twice at once
-      const r = await followups.updateOne(
-        { _id: f._id, tz_fixed: { $ne: true } },
-        { $set: { scheduled_date: new Date(f.scheduled_date.getTime() - SHIFT_MS), tz_fixed: true } }
-      );
-      shifted += r.modifiedCount;
-    }
+    const shifted = await fixFollowUpTimes(before);
     console.log(`\nShifted ${shifted} follow-ups back by 5h30.`);
   }
   await mongoose.disconnect();

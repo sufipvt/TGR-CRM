@@ -15,3 +15,19 @@
       </form>
     </div>
 
+
+    <% if (data.unfixed_followups > 0) { %>
+      <div class="tg-panel mt-3" style="max-width:640px;">
+        <h2 class="tg-panel-title">Fix old follow-up times</h2>
+        <p class="mb-3">
+          <strong><%= data.unfixed_followups.toLocaleString('en-IN') %></strong> follow-up<%= data.unfixed_followups === 1 ? ' was' : 's were' %> saved before the CRM switched to India time
+          and now show 5h30 late (10:00 shows as 15:30). This moves them back to the time that was typed in.
+          It only needs doing once, and this box disappears afterwards.
+        </p>
+        <form method="POST" action="/app?page=settings"
+              onsubmit="return confirm('Move <%= data.unfixed_followups %> old follow-ups back by 5h30?')">
+          <input type="hidden" name="action" value="fix_followup_times">
+          <button type="submit" class="btn btn-warning">Fix old follow-up times</button>
+        </form>
+      </div>
+    <% } %>
