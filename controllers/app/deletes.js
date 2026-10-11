@@ -6,6 +6,9 @@ const { isSuperAdmin, isManager } = require('../../utils/roles');
 const { isValidObjectId } = require('mongoose');
 const { audit } = require('../../services/audit');
 const { userContextCache } = require('../../middleware/auth');
+const { canEditLead, canActForUser } = require('../../services/access');
+
+function forbidden() { return Object.assign(new Error('Forbidden'), { status: 403 }); }
 
 async function handleDelete(req) {
   const { table, id } = req.query;
@@ -16,7 +19,7 @@ async function handleDelete(req) {
 
   switch (table) {
     case 'leads': {
-      if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!manager || !(await canEditLead(user, id))) throw forbidden();
       await FollowUp.deleteMany({ lead_id: id });
       await Lead.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'Lead', id, {});
@@ -64,7 +67,7 @@ async function handleDelete(req) {
     case 'followups': {
       const f = await FollowUp.findById(id);
       if (!f) break;
-      if (!manager && String(f.assigned_to_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, f.assigned_to_id))) throw forbidden();
       await FollowUp.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'FollowUp', id, {});
       break;
@@ -72,7 +75,7 @@ async function handleDelete(req) {
     case 'bookings': {
       const b = await Booking.findById(id);
       if (!b) break;
-      if (!manager && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, b.closer_id))) throw forbidden();
       await Payment.deleteMany({ booking_id: id });
       await Unit.findByIdAndUpdate(b.unit_id, { status: 'Available' });
       //await Lead.findByIdAndUpdate(b.lead_id, { status: 'Negotiation', booked_at: null });
@@ -88,7 +91,7 @@ async function handleDelete(req) {
       const p = await Payment.findById(id);
       if (!p) break;
       const b = await Booking.findById(p.booking_id);
-      if (!manager && b && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, b && b.closer_id))) throw forbidden();
       await Payment.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'Payment', id, {});
       break;
