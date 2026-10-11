@@ -14,6 +14,7 @@ const {
   reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope
 } = require('../../services/reports');
 const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
+const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -31,9 +32,9 @@ async function appHandler(req, res) {
     if (req.method === 'POST' && req.body && req.body.action) {
       try {
         const msg = await handlePostAction(req);
-        return res.redirect('/app?page=' + encodeURIComponent(page) + '&msg=' + encodeURIComponent(msg));
+        return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent(msg));
       } catch (e) {
-        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + '&msg=' + encodeURIComponent('Error: ' + e.message));
+        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
         throw e;
       }
     }
@@ -42,9 +43,9 @@ async function appHandler(req, res) {
     if (req.query.delete && req.query.table && req.query.id) {
       try {
         await handleDelete(req);
-        return res.redirect('/app?page=' + encodeURIComponent(page) + '&msg=' + encodeURIComponent('Deleted successfully.'));
+        return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Deleted successfully.'));
       } catch (e) {
-        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + '&msg=' + encodeURIComponent('Error: ' + e.message));
+        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
         throw e;
       }
     }
@@ -95,9 +96,9 @@ async function appHandler(req, res) {
         { $sort: { revenue: -1 } }
       ]) : [];
     } else if (page === 'leads') {
-      data.leads = await Lead.find(leadFilter)
-        .populate('project_id source_id assigned_caller_id assigned_closer_id')
-        .sort('-created_at');
+      const { leads, list } = await loadLeadPage(Lead, leadFilter, req.query);
+      data.leads = leads;
+      data.lead_list = list;
       data.users = isTeamLeader(user.role)
         ? await User.find({ status: 'Active', team_id: user.team_id }).select('full_name role')
         : await User.find({ status: 'Active' }).select('full_name role');

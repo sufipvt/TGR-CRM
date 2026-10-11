@@ -112,11 +112,7 @@ function tgRenderCharts() {
 document.addEventListener('DOMContentLoaded', () => {
   tgRenderCharts();
 
-  // Leads filters
-  ['leadSearch', 'leadStatusFilter', 'leadSourceFilter', 'leadProjectFilter', 'leadTemperatureFilter'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', filterLeads);
-  });
+  // Leads filters are a GET form (server-side search + paging); see views/pages/leads.ejs
 
   // Bookings filters
   ['bookingSearch', 'bookingStatusFilter'].forEach(id => {
@@ -137,36 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /* ============================ LEADS PAGE ============================ */
-function filterLeads() {
-  const q    = (document.getElementById('leadSearch')?.value    || '').toLowerCase();
-  const st   =  document.getElementById('leadStatusFilter')?.value  || '';
-  const src  =  document.getElementById('leadSourceFilter')?.value  || '';
-  const prj  =  document.getElementById('leadProjectFilter')?.value || '';
-  const temp =  document.getElementById('leadTemperatureFilter')?.value || '';
-
-  // Table rows
-  document.querySelectorAll('#leadsTable tbody tr[data-search]').forEach(tr => {
-    const ok = (!q    || tr.dataset.search.includes(q))     &&
-               (!st   || tr.dataset.status  === st)          &&
-               (!src  || tr.dataset.source  === src)         &&
-               (!prj  || tr.dataset.project === prj)         &&
-               (!temp || tr.dataset.temperature === temp);
-    tr.style.display = ok ? '' : 'none';
-  });
-
-  // Kanban cards
-  document.querySelectorAll('.tg-kanban-card').forEach(card => {
-    const ok = (!q    || card.dataset.search.includes(q))     &&
-               (!st   || card.dataset.status  === st)          &&
-               (!src  || card.dataset.source  === src)         &&
-               (!prj  || card.dataset.project === prj)         &&
-               (!temp || card.dataset.temperature === temp);
-    card.style.display = ok ? '' : 'none';
-  });
-
-  tgUpdateKanbanCounts();
-}
-
 const TG_NOT_INTERESTED_REASONS = ['Budget Mismatch','Location Mismatch','Timeline Mismatch (not buying soon)','Property Type Mismatch','Already Purchased Elsewhere','Other'];
 const TG_LOST_REASONS = ['Chose a Competitor Project','Price Negotiation Failed','Financing / Loan Rejected','Changed Mind','Other'];
 
