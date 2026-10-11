@@ -11,11 +11,9 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
-const multer = require('multer');
 const { parse: parseCsvSync } = require('csv-parse/sync');
 const sgMail = require('@sendgrid/mail');
 const cron = require('node-cron');
-const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 const path = require('path');
 const PDFDocument = require('pdfkit');
@@ -59,6 +57,11 @@ const { getNextCaller } = require('./services/assignment');
 const {
   getTeamMemberIds, visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter, canEditLead
 } = require('./services/access');
+const {
+  requireAuth, requireAdmin, requireSuperAdmin, refreshUserContext, userContextCache
+} = require('./middleware/auth');
+const { loginLimiter, chatLimiter, expensiveOpLimiter, appActionLimiter } = require('./middleware/rateLimits');
+const { upload } = require('./middleware/upload');
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -246,68 +249,6 @@ async function resolveReportScope(user, scopeParam) {
 }
 
 // ---------------------------------------------------------------------------
-// AUTH MIDDLEWARE
-// ---------------------------------------------------------------------------
-function requireAuth(req, res, next) {
-  const token = req.cookies.tg_token;
-  if (!token) return res.redirect('/login');
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    next();
-  } catch (e) {
-    res.clearCookie('tg_token');
-    res.redirect('/login?error=' + encodeURIComponent('Session expired, please sign in again'));
-  }
-}
-function requireAdmin(req, res, next) {
-  if (!isAdminRole(req.user.role)) return res.status(403).send('Forbidden');
-  next();
-}
-function requireSuperAdmin(req, res, next) {
-  if (!isSuperAdmin(req.user.role)) return res.status(403).send('Forbidden');
-  next();
-}
-
-// Short-lived cache so we don't hit the DB on every request, while still
-// catching deactivation/role changes within seconds instead of up to 8 hours.
-const userContextCache = new Map();
-const USER_CACHE_TTL = 30 * 1000;
-
-async function refreshUserContext(req, res, next) {
-  try {
-    const uid = req.user.userId;
-    const cached = userContextCache.get(uid);
-    const now = Date.now();
-
-    if (cached && cached.expires > now) {
-      if (cached.data === null) {
-        res.clearCookie('tg_token');
-        return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
-      }
-      Object.assign(req.user, cached.data);
-      return next();
-    }
-
-    const dbUser = await User.findById(uid).select('role team_id status full_name');
-    if (!dbUser || dbUser.status !== 'Active') {
-      userContextCache.set(uid, { data: null, expires: now + USER_CACHE_TTL });
-      res.clearCookie('tg_token');
-      return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
-    }
-
-    const fresh = { role: dbUser.role, team_id: dbUser.team_id, name: dbUser.full_name };
-    userContextCache.set(uid, { data: fresh, expires: now + USER_CACHE_TTL });
-    Object.assign(req.user, fresh);
-    next();
-  } catch (e) {
-    // Fail OPEN on a transient DB hiccup — the signed JWT is still valid,
-    // and locking everyone out due to a momentary blip would hurt availability more than it helps security.
-    console.error('refreshUserContext error (failing open):', e.message);
-    next();
-  }
-}
-
-// ---------------------------------------------------------------------------
 // APP SETUP
 // ---------------------------------------------------------------------------
 const app = express();
@@ -326,50 +267,6 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
 app.locals.formatDateTime = formatDateTime;
-
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many login attempts. Please try again in 15 minutes.'
-});
-
-// Chatbot — cost-sensitive (calls Groq API), stricter window
-const chatLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 30,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { reply: "You're sending messages a bit fast \u2014 please wait a moment and try again." }
-});
-
-// Heavy operations — PDF generation, CSV import (multiple DB aggregations / file parsing)
-const expensiveOpLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests for this action. Please wait a few minutes and try again.'
-});
-
-// General authenticated app traffic — generous ceiling, well above normal multi-page navigation
-const appActionLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 400,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: 'Too many requests. Please slow down and try again shortly.'
-});
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => {
-    if (file.originalname.toLowerCase().endsWith('.csv')) cb(null, true);
-    else cb(new Error('Only .csv files are allowed'));
-  }
-});
 
 // ---------------------------------------------------------------------------
 // PUBLIC ROUTES
