@@ -3,11 +3,14 @@ const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team
 } = require('../../models');
 const { isSuperAdmin, isManager } = require('../../utils/roles');
+const { isValidObjectId } = require('mongoose');
 const { audit } = require('../../services/audit');
 const { userContextCache } = require('../../middleware/auth');
 
 async function handleDelete(req) {
   const { table, id } = req.query;
+  // Every delete is by a single document id; anything else is refused before any write.
+  if (typeof id !== 'string' || !isValidObjectId(id)) throw Object.assign(new Error('Invalid id'), { status: 400 });
   const user = req.user;
   const manager = isManager(user.role);
 
