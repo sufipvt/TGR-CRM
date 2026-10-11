@@ -57,6 +57,8 @@ async function appHandler(req, res) {
     const fuFilter = await visibleFollowUpFilter(user);
     const bookingFilter = await visibleBookingFilter(user);
     const userId = new Types.ObjectId(user.userId);
+    // Team Leaders only pick assignees from their own team
+    const teamScope = isTeamLeader(user.role) ? { team_id: user.team_id } : {};
 
     const data = {};
     data.projects = await Project.find().sort('name');
@@ -101,13 +103,13 @@ async function appHandler(req, res) {
     } else if (page === 'followups') {
       data.followups = await FollowUp.find(fuFilter).populate({ path: 'lead_id', select: 'name phone' }).populate('assigned_to_id').sort('scheduled_date');
       data.leads_for_fu = await Lead.find(leadFilter).select('name phone').sort('name');
-      data.users = await User.find({ status: 'Active' }).select('full_name role');
+      data.users = await User.find({ status: 'Active', ...teamScope }).select('full_name role');
     } else if (page === 'bookings') {
       data.bookings = await Booking.find(bookingFilter)
         .populate('lead_id project_id unit_id closer_id')
         .sort('-booking_date');
       data.payments = await Payment.find({ booking_id: { $in: data.bookings.map(b => b._id) } });
-      data.closers = await User.find({ role: { $in: ['Team Leader', 'Sub Team Leader'] }, status: 'Active' }).select('full_name');
+      data.closers = await User.find({ role: { $in: ['Team Leader', 'Sub Team Leader'] }, status: 'Active', ...teamScope }).select('full_name');
       data.qualified_leads = await Lead.find({ ...leadFilter, status: { $in: ['Qualified', 'Site Visit Scheduled', 'Negotiation'] } }).select('name phone project_id');
     } else if (page === 'projects') {
       if (!isManager(user.role)) return res.redirect('/app?page=dashboard');

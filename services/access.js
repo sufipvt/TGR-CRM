@@ -55,10 +55,36 @@ async function canEditLead(user, leadId) {
   return false;
 }
 
+// Can this user act on records owned by targetUserId (a follow-up's assignee,
+// a booking's closer)? Admins: anyone. Team Leaders: anyone in their team.
+// Sub Team Leaders: only themselves.
+async function canActForUser(user, targetUserId) {
+  if (isAdminRole(user.role)) return true;
+  if (!targetUserId) return false;
+  const target = String(targetUserId);
+  if (target === String(user.userId)) return true;
+  if (isTeamLeader(user.role)) {
+    return (await getTeamMemberIds(user)).map(String).includes(target);
+  }
+  return false;
+}
+
+// Can this user hand work (a lead, follow-up, booking) to targetUserId?
+// Admins: anyone. Everyone else: themselves or someone in their own team.
+async function canAssignTo(user, targetUserId) {
+  if (isAdminRole(user.role)) return true;
+  if (!targetUserId) return true; // leaving it unassigned is always allowed
+  const target = String(targetUserId);
+  if (target === String(user.userId)) return true;
+  return (await getTeamMemberIds(user)).map(String).includes(target);
+}
+
 module.exports = {
   getTeamMemberIds,
   visibleLeadFilter,
   visibleFollowUpFilter,
   visibleBookingFilter,
-  canEditLead
+  canEditLead,
+  canActForUser,
+  canAssignTo
 };

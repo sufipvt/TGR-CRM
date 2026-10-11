@@ -3,7 +3,6 @@ const express = require('express');
 const { LEAD_STATUSES } = require('../config/constants');
 const { Unit, Lead, FollowUp, Booking, AuditLog } = require('../models');
 const { formatMoney } = require('../utils/format');
-const { isManager } = require('../utils/roles');
 const { audit } = require('../services/audit');
 const { canEditLead } = require('../services/access');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
@@ -47,12 +46,8 @@ router.get('/api/lead-timeline/:leadId', requireAuth, appActionLimiter, refreshU
     const lead = await Lead.findById(leadId).populate('source_id project_id assigned_caller_id assigned_closer_id');
     if (!lead) return res.status(404).json({ error: 'Not found' });
 
-    // RBAC: non-managers can only view their own leads
-    if (!isManager(req.user.role)) {
-      const uid = String(req.user.userId);
-      const owns = String(lead.assigned_caller_id?._id || '') === uid || String(lead.assigned_closer_id?._id || '') === uid;
-      if (!owns) return res.status(403).json({ error: 'Forbidden' });
-    }
+    // Same rule as editing: own leads, your team's leads, or everything for admins
+    if (!(await canEditLead(req.user, leadId))) return res.status(403).json({ error: 'Forbidden' });
 
     const events = [];
     events.push({ type: 'created', date: lead.created_at, label: 'Lead created', detail: 'Source: ' + (lead.source_id?.name || '\u2014') });

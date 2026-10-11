@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Syntax-check server code
+        run: for f in $(git ls-files '*.js' | grep -v '^public/'); do node --check "$f" || exit 1; done
+      - name: Compile every EJS view
+        run: node -e "const ejs=require('ejs'),fs=require('fs');for(const f of process.argv.slice(1))ejs.compile(fs.readFileSync(f,'utf8'),{filename:f});console.log('views ok')" views/*.ejs views/pages/*.ejs views/partials/*.ejs
+      - name: Tests
+        run: npm test
+        env:
+          TEST_MONGODB_URI: mongodb://127.0.0.1:27017

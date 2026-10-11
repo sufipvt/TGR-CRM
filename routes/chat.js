@@ -1,7 +1,9 @@
 // AI chatbot API
 const express = require('express');
-const { User, Project, Lead, FollowUp, Booking } = require('../models');
-const { isAdminOrMD } = require('../utils/roles');
+const { Project, Lead, FollowUp, Booking } = require('../models');
+const { isAdminRole, isTeamLeader } = require('../utils/roles');
+const { escapeRegex } = require('../utils/request');
+const { visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter } = require('../services/access');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { chatLimiter } = require('../middleware/rateLimits');
 
@@ -11,16 +13,21 @@ const router = express.Router();
 router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (req, res) => {
   try {
     const { message, history = [] } = req.body;
-    const user = await User.findById(req.user.userId);
-    if (!message) return res.json({ reply: 'Please type a message.' });
+    if (!message || typeof message !== 'string') return res.json({ reply: 'Please type a message.' });
+    const user = req.user;
+
+    // Every answer is limited to what this user may see elsewhere in the CRM:
+    // admins see the company, Team Leaders their team, everyone else their own work.
+    const [leadFilter, fuFilter, bookingFilter] = await Promise.all([
+      visibleLeadFilter(user), visibleFollowUpFilter(user), visibleBookingFilter(user)
+    ]);
+    const scopeLabel = isAdminRole(user.role) ? 'the whole company' : isTeamLeader(user.role) ? 'their team' : 'their own leads';
+    const matchStage = f => (Object.keys(f).length ? [{ $match: f }] : []);
 
     const cmd = message.trim().toLowerCase();
 
     if (cmd === '/leads' || cmd === 'my leads') {
-      const filter = isAdminOrMD(user)
-        ? {}
-        : { $or: [{ assigned_caller_id: user._id }, { assigned_closer_id: user._id }] };
-      const leads = await Lead.find(filter).sort('-created_at').limit(5).populate('project_id source_id');
+      const leads = await Lead.find(leadFilter).sort('-created_at').limit(5).populate('project_id source_id');
       if (!leads.length) return res.json({ reply: 'No leads found.' });
       const list = leads.map(l =>
         `• **${l.name}** — ${l.phone} — ${l.status} — ${l.project_id?.name || '—'}`
@@ -29,10 +36,7 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     }
 
     if (cmd === '/overdue') {
-      const filter = isAdminOrMD(user)
-        ? { status: 'Pending', scheduled_date: { $lt: new Date() } }
-        : { assigned_to_id: user._id, status: 'Pending', scheduled_date: { $lt: new Date() } };
-      const fus = await FollowUp.find(filter).populate('lead_id').limit(5);
+      const fus = await FollowUp.find({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }).populate('lead_id').limit(5);
       if (!fus.length) return res.json({ reply: '✅ No overdue follow-ups!' });
       const list = fus.map(f =>
         `• **${f.lead_id?.name || '—'}** — ${f.type} — Due: ${new Date(f.scheduled_date).toLocaleDateString('en-IN')}`
@@ -43,10 +47,7 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     if (cmd === '/today') {
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       const todayEnd   = new Date(); todayEnd.setHours(23,59,59,999);
-      const filter = isAdminOrMD(user)
-        ? { status: 'Pending', scheduled_date: { $gte: todayStart, $lte: todayEnd } }
-        : { assigned_to_id: user._id, status: 'Pending', scheduled_date: { $gte: todayStart, $lte: todayEnd } };
-      const fus = await FollowUp.find(filter).populate('lead_id').sort('scheduled_date');
+      const fus = await FollowUp.find({ ...fuFilter, status: 'Pending', scheduled_date: { $gte: todayStart, $lte: todayEnd } }).populate('lead_id').sort('scheduled_date');
       if (!fus.length) return res.json({ reply: '✅ No follow-ups scheduled for today!' });
       const list = fus.map(f =>
         `• **${f.lead_id?.name || '—'}** — ${f.type} at ${new Date(f.scheduled_date).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
@@ -55,14 +56,13 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     }
 
     if (cmd === '/stats') {
-      const filter = isAdminOrMD(user)
-        ? {}
-        : { $or: [{ assigned_caller_id: user._id }, { assigned_closer_id: user._id }] };
-      const totalLeads = await Lead.countDocuments(filter);
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const newToday   = await Lead.countDocuments({ ...filter, created_at: { $gte: todayStart } });
-      const pendingFU  = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending' });
-      const overdueFU  = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending', scheduled_date: { $lt: new Date() } });
+      const [totalLeads, newToday, pendingFU, overdueFU] = await Promise.all([
+        Lead.countDocuments(leadFilter),
+        Lead.countDocuments({ ...leadFilter, created_at: { $gte: todayStart } }),
+        FollowUp.countDocuments({ ...fuFilter, status: 'Pending' }),
+        FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } })
+      ]);
       return res.json({ reply:
         `📊 **Your Stats**\n` +
         `• Total Leads: ${totalLeads}\n` +
@@ -73,8 +73,7 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     }
 
     if (cmd === '/bookings') {
-      const filter = isAdminOrMD(user) ? {} : { closer_id: user._id };
-      const bookings = await Booking.find(filter).sort('-booking_date').limit(5).populate('lead_id project_id');
+      const bookings = await Booking.find(bookingFilter).sort('-booking_date').limit(5).populate('lead_id project_id');
       if (!bookings.length) return res.json({ reply: 'No bookings found.' });
       const list = bookings.map(b =>
         `• **${b.lead_id?.name || '—'}** — ${b.project_id?.name || '—'} — ₹${Number(b.sale_value).toLocaleString('en-IN')}`
@@ -83,9 +82,8 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     }
 
     if (cmd === '/revenue') {
-      const filter = isAdminOrMD(user) ? {} : { closer_id: user._id };
       const agg = await Booking.aggregate([
-        ...(Object.keys(filter).length ? [{ $match: filter }] : []),
+        ...matchStage(bookingFilter),
         { $group: { _id: null, total: { $sum: '$sale_value' }, count: { $sum: 1 } } }
       ]);
       const total = agg[0]?.total || 0;
@@ -99,18 +97,16 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     }
 
     if (cmd === '/pipeline') {
-      const baseFilter = isAdminOrMD(user)
-        ? {}
-        : { $or: [{ assigned_caller_id: user._id }, { assigned_closer_id: user._id }] };
       const statuses = ['New','Working','Qualified','Site Visit Scheduled','Negotiation'];
-      const counts = await Promise.all(statuses.map(s => Lead.countDocuments({ ...baseFilter, status: s })));
+      const counts = await Promise.all(statuses.map(s => Lead.countDocuments({ ...leadFilter, status: s })));
       const list = statuses.map((s, i) => `• ${s}: ${counts[i]}`).join('\n');
       return res.json({ reply: `🔄 **Pipeline Status:**\n${list}` });
     }
 
     if (cmd.startsWith('/search ')) {
-      const q = cmd.replace('/search ', '').trim();
-      const leads = await Lead.find({ name: { $regex: q, $options: 'i' } }).limit(5).populate('project_id');
+      const q = message.trim().slice('/search '.length).trim();
+      if (!q) return res.json({ reply: 'Type a name after /search.' });
+      const leads = await Lead.find({ ...leadFilter, name: { $regex: escapeRegex(q), $options: 'i' } }).limit(5).populate('project_id');
       if (!leads.length) return res.json({ reply: `No leads found for "${q}".` });
       const list = leads.map(l =>
         `• **${l.name}** — ${l.phone} — ${l.status} — ${l.project_id?.name || '—'}`
@@ -139,80 +135,54 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
       return res.json({ reply: 'AI not configured. Use /help for commands.' });
     }
 
-    // Global CRM context
-    const totalLeads    = await Lead.countDocuments();
-    const totalBookings = await Booking.countDocuments();
-    const totalProjects = await Project.countDocuments();
-    const projectsList  = await Project.find()
-      .select('name status city price_range total_units available_units project_type notes').lean();
+    // Context for the model, computed with the same visibility filters as above,
+    // so the model is never handed numbers the user isn't allowed to see.
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const [
+      totalLeads, newToday, totalBookings, projectsList, pendingFUs, overdueFUs, revenueAgg, byStatus, topSources
+    ] = await Promise.all([
+      Lead.countDocuments(leadFilter),
+      Lead.countDocuments({ ...leadFilter, created_at: { $gte: todayStart } }),
+      Booking.countDocuments(bookingFilter),
+      Project.find().select('name status city price_range total_units available_units project_type notes').lean(),
+      FollowUp.countDocuments({ ...fuFilter, status: 'Pending' }),
+      FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }),
+      Booking.aggregate([...matchStage(bookingFilter), { $group: { _id: null, total: { $sum: '$sale_value' } } }]),
+      Lead.aggregate([...matchStage(leadFilter), { $group: { _id: '$status', count: { $sum: 1 } } }]),
+      Lead.aggregate([
+        ...matchStage(leadFilter),
+        { $group: { _id: '$source_id', count: { $sum: 1 } } },
+        { $sort: { count: -1 } }, { $limit: 3 },
+        { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'src' } }
+      ])
+    ]);
     const projectSummary = projectsList.map(p =>
       `  - ${p.name} | Type: ${p.project_type || '—'} | City: ${p.city || '—'} | Status: ${p.status} | Price: ${p.price_range || '—'} | Units: ${p.available_units}/${p.total_units} available | Notes: ${p.notes || '—'}`
     ).join('\n');
-    const pendingFUs   = await FollowUp.countDocuments({ status: 'Pending' });
-    const overdueFUs   = await FollowUp.countDocuments({ status: 'Pending', scheduled_date: { $lt: new Date() } });
-    const revenueAgg   = await Booking.aggregate([{ $group: { _id: null, total: { $sum: '$sale_value' } } }]);
     const totalRevenue = revenueAgg[0]?.total || 0;
-    const todayStart   = new Date(); todayStart.setHours(0,0,0,0);
-    const newToday     = await Lead.countDocuments({ created_at: { $gte: todayStart } });
-    const byStatus     = await Lead.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]);
     const statusSummary = byStatus.map(s => `${s._id}: ${s.count}`).join(', ');
-    const topSources   = await Lead.aggregate([
-      { $group: { _id: '$source_id', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }, { $limit: 3 },
-      { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'src' } }
-    ]);
     const sourceSummary = topSources.map(s => `${s.src[0]?.name || '—'}: ${s.count}`).join(', ');
-
-    // Role-aware personal section — non-managers only see their own data
-    let personalSection = '';
-    if (!isAdminOrMD(user)) {
-      const myFilter   = user.role === 'Caller'
-        ? { assigned_caller_id: user._id }
-        : { assigned_closer_id: user._id };
-      const myLeads    = await Lead.countDocuments(myFilter);
-      const myNewToday = await Lead.countDocuments({ ...myFilter, created_at: { $gte: todayStart } });
-      const myFUs      = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending' });
-      const myOverdue  = await FollowUp.countDocuments({ assigned_to_id: user._id, status: 'Pending', scheduled_date: { $lt: new Date() } });
-      personalSection  =
-        `\n\nPersonal Stats for ${user.full_name} (${user.role}):\n` +
-        `- My Assigned Leads: ${myLeads} (${myNewToday} new today)\n` +
-        `- My Pending Follow-Ups: ${myFUs} (${myOverdue} overdue)`;
-      if (user.role === 'Closer') {
-        const myBkgs = await Booking.aggregate([
-          { $match: { closer_id: user._id } },
-          { $group: { _id: null, count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } }
-        ]);
-        personalSection +=
-          `\n- My Bookings: ${myBkgs[0]?.count || 0}, ` +
-          `Revenue: ₹${(myBkgs[0]?.revenue || 0).toLocaleString('en-IN')}`;
-      }
-    }
 
     const systemPrompt =
       `You are TG Assistant, the AI helper for TrueGrowth CRM — a real estate sales CRM used in India.\n` +
       `You only answer questions about CRM data. Be concise, helpful, and use Indian context (₹ for currency).\n` +
-      `Current CRM Data:\n` +
+      `Logged in user: ${user.name} (${user.role}). The lead, follow-up and booking numbers below cover ${scopeLabel}.\n` +
+      `CRM Data:\n` +
       `- Total Leads: ${totalLeads} (${newToday} new today)\n` +
       `- Lead Status Breakdown: ${statusSummary}\n` +
       `- Total Bookings: ${totalBookings}\n` +
       `- Total Revenue: ₹${totalRevenue.toLocaleString('en-IN')}\n` +
       `- Pending Follow-Ups: ${pendingFUs} (${overdueFUs} overdue)\n` +
-      `- Total Projects: ${totalProjects}\n` +
-      `- Project Details:\n${projectSummary}\n` +
+      `- Projects (company inventory, ${projectsList.length}):\n${projectSummary}\n` +
       `- Top Lead Sources: ${sourceSummary}\n` +
-      `- Logged in user: ${user.full_name} (${user.role})` +
-      personalSection + '\n' +
-      (isAdminOrMD(user)
-        ? 'This user is a Manager/Admin and can see all team data.'
-        : `IMPORTANT: This user is a ${user.role}. Only reference their personal stats, not team-wide numbers.`) +
-      '\nAnswer only based on this data. If asked something outside CRM scope, politely decline.';
+      'Answer only based on this data. If asked something outside CRM scope, politely decline.';
 
     // Multi-turn conversation memory — last 8 exchanges sent to Groq
     const groqMessages = [
       { role: 'system', content: systemPrompt },
       ...Array.isArray(history) ? history.slice(-8).map(h => ({
-        role: h.type === 'user' ? 'user' : 'assistant',
-        content: String(h.text || '').replace(/<[^>]+>/g, '').trim()
+        role: h && h.type === 'user' ? 'user' : 'assistant',
+        content: String((h && h.text) || '').replace(/<[^>]+>/g, '').trim()
       })).filter(m => m.content) : [],
       { role: 'user', content: message }
     ];
@@ -228,9 +198,14 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
         messages: groqMessages,
         max_tokens: 300,
         temperature: 0.3
-      })
+      }),
+      signal: AbortSignal.timeout(20000) // never hold the request open on a hung provider
     });
 
+    if (!groqRes.ok) {
+      console.error('Groq error:', groqRes.status, (await groqRes.text()).slice(0, 300));
+      return res.json({ reply: 'The assistant is unavailable right now. Use /help for quick commands.' });
+    }
     const groqData = await groqRes.json();
     const reply = groqData.choices?.[0]?.message?.content || 'Sorry, I could not process that.';
     res.json({ reply });

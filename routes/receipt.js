@@ -2,7 +2,7 @@
 const express = require('express');
 const { Booking, Payment } = require('../models');
 const { sendErrorPage } = require('../utils/errorPage');
-const { isManager } = require('../utils/roles');
+const { canActForUser } = require('../services/access');
 const { getSettings } = require('../services/settings');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { appActionLimiter } = require('../middleware/rateLimits');
@@ -16,11 +16,9 @@ router.get('/app/receipt/:bookingId', requireAuth, appActionLimiter, refreshUser
   try {
     const booking = await Booking.findById(req.params.bookingId).populate('lead_id project_id unit_id closer_id');
     if (!booking) return res.status(404).send('Booking not found');
-    // RBAC: closers can only view their own booking receipts
-    if (!isManager(req.user.role)) {
-      if (req.user.role !== 'Closer' || String(booking.closer_id?._id) !== String(req.user.userId)) {
-        return res.status(403).send('Forbidden');
-      }
+    // Own bookings, your team's bookings, or everything for admins
+    if (!(await canActForUser(req.user, booking.closer_id?._id))) {
+      return res.status(403).send('Forbidden');
     }
     const payments = await Payment.find({ booking_id: booking._id }).sort('payment_date');
     const amount_paid = payments.reduce((s, p) => s + p.amount, 0);

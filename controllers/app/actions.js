@@ -9,11 +9,20 @@ const {
 } = require('../../models');
 const { formatMoney } = require('../../utils/format');
 const { cleanBody, objIdOrNull } = require('../../utils/request');
-const { isSuperAdmin, isTeamLeader, isManager } = require('../../utils/roles');
+const { isSuperAdmin, isAdminRole, isTeamLeader, isManager } = require('../../utils/roles');
 const { audit } = require('../../services/audit');
 const { getNextCaller } = require('../../services/assignment');
-const { canEditLead } = require('../../services/access');
+const { canEditLead, canActForUser, canAssignTo } = require('../../services/access');
 const { userContextCache } = require('../../middleware/auth');
+
+function forbidden(msg) { return Object.assign(new Error(msg || 'Forbidden'), { status: 403 }); }
+
+// Every id the user picks for someone to own the record must be inside their reach.
+async function assertAssignable(user, ...ids) {
+  for (const id of ids) {
+    if (!(await canAssignTo(user, id))) throw forbidden('You can only assign work to your own team');
+  }
+}
 
 async function handlePostAction(req) {
   const body = cleanBody(req.body);
@@ -23,6 +32,7 @@ async function handlePostAction(req) {
 
   switch (action) {
     case 'add_lead': {
+      await assertAssignable(user, objIdOrNull(body.assigned_caller_id), objIdOrNull(body.assigned_closer_id));
       const caller = objIdOrNull(body.assigned_caller_id) || await getNextCaller();
       const lead = await Lead.create({
         name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
@@ -50,6 +60,13 @@ async function handlePostAction(req) {
       if (manager) {
         update.assigned_caller_id = objIdOrNull(body.assigned_caller_id);
         update.assigned_closer_id = objIdOrNull(body.assigned_closer_id);
+        // Only check people who are being newly assigned, so editing a lead that was
+        // handed to someone outside the team doesn't block unrelated changes.
+        const current = await Lead.findById(body.lead_id).select('assigned_caller_id assigned_closer_id');
+        const changed = ['assigned_caller_id', 'assigned_closer_id']
+          .filter(k => String(update[k] || '') !== String((current && current[k]) || ''))
+          .map(k => update[k]);
+        await assertAssignable(user, ...changed);
       }
       if (LEAD_TEMPERATURES.includes(body.temperature)) {
         update.temperature = body.temperature;
@@ -103,6 +120,7 @@ async function handlePostAction(req) {
     }
     case 'qualify_lead': {
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      await assertAssignable(user, objIdOrNull(body.assigned_closer_id));
       await Lead.findByIdAndUpdate(body.lead_id, {
         status: 'Qualified',
         assigned_closer_id: objIdOrNull(body.assigned_closer_id),
@@ -193,6 +211,7 @@ async function handlePostAction(req) {
     case 'add_followup': {
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
       const assignee = manager ? (objIdOrNull(body.assigned_to_id) || new Types.ObjectId(user.userId)) : new Types.ObjectId(user.userId);
+      await assertAssignable(user, assignee);
       const f = await FollowUp.create({
         lead_id: objIdOrNull(body.lead_id), assigned_to_id: assignee,
         scheduled_date: new Date(body.scheduled_date), type: body.type || 'Call',
@@ -204,9 +223,12 @@ async function handlePostAction(req) {
     case 'update_followup': {
       const f = await FollowUp.findById(body.followup_id);
       if (!f) throw Object.assign(new Error('Not found'), { status: 404 });
-      if (!manager && String(f.assigned_to_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, f.assigned_to_id))) throw forbidden();
       const update = { scheduled_date: new Date(body.scheduled_date), type: body.type, notes: body.notes, status: body.status || f.status, outcome: body.outcome };
-      if (manager && body.assigned_to_id) update.assigned_to_id = objIdOrNull(body.assigned_to_id);
+      if (manager && body.assigned_to_id) {
+        update.assigned_to_id = objIdOrNull(body.assigned_to_id);
+        if (String(update.assigned_to_id || '') !== String(f.assigned_to_id || '')) await assertAssignable(user, update.assigned_to_id);
+      }
       await FollowUp.findByIdAndUpdate(body.followup_id, update);
       await audit(user.email, 'update', 'FollowUp', body.followup_id, {});
       return 'Follow-up updated.';
@@ -214,7 +236,7 @@ async function handlePostAction(req) {
     case 'complete_followup': {
       const f = await FollowUp.findById(body.followup_id);
       if (!f) throw Object.assign(new Error('Not found'), { status: 404 });
-      if (!manager && String(f.assigned_to_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, f.assigned_to_id))) throw forbidden();
       await FollowUp.findByIdAndUpdate(body.followup_id, { status: 'Completed', completed_date: new Date(), outcome: body.outcome || '' });
       await audit(user.email, 'update', 'FollowUp', body.followup_id, { completed: true });
       return 'Follow-up completed.';
@@ -227,6 +249,8 @@ async function handlePostAction(req) {
       if (!manager && String(lead.assigned_closer_id || '') !== String(user.userId)) {
         throw Object.assign(new Error('You can only book your own leads'), { status: 403 });
       }
+      if (!(await canEditLead(user, leadId))) throw forbidden('You can only book your own team\'s leads');
+      await assertAssignable(user, closerId);
       const b = await Booking.create({
         lead_id: leadId, project_id: objIdOrNull(body.project_id), unit_id: objIdOrNull(body.unit_id),
         closer_id: closerId, booking_date: body.booking_date ? new Date(body.booking_date) : new Date(),
@@ -241,7 +265,7 @@ async function handlePostAction(req) {
     case 'update_booking': {
       const b = await Booking.findById(body.booking_id);
       if (!b) throw Object.assign(new Error('Not found'), { status: 404 });
-      if (!manager && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, b.closer_id))) throw forbidden();
       await Booking.findByIdAndUpdate(body.booking_id, {
         sale_value: Number(body.sale_value || 0), booking_amount: Number(body.booking_amount || 0),
         booking_date: body.booking_date ? new Date(body.booking_date) : b.booking_date,
@@ -253,7 +277,7 @@ async function handlePostAction(req) {
     case 'add_payment': {
       const b = await Booking.findById(body.booking_id);
       if (!b) throw Object.assign(new Error('Booking not found'), { status: 404 });
-      if (!manager && String(b.closer_id) !== String(user.userId)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!(await canActForUser(user, b.closer_id))) throw forbidden();
       const payments = await Payment.find({ booking_id: b._id });
       const paid = payments.reduce((s, p) => s + p.amount, 0);
       const amt = Number(body.amount || 0);
@@ -301,6 +325,18 @@ async function handlePostAction(req) {
     }
     case 'assign_team_member': {
       if (!isSuperAdmin(user.role) && !isTeamLeader(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (isTeamLeader(user.role)) {
+        // A Team Leader may only add unassigned agents to their own team, or
+        // release their own members. They can't pull people from other teams.
+        const target = await User.findById(objIdOrNull(body.user_id)).select('team_id role');
+        if (!target || isAdminRole(target.role)) throw forbidden();
+        const ownTeam = String(user.team_id || '');
+        const newTeam = String(objIdOrNull(body.team_id) || '');
+        const currentTeam = String(target.team_id || '');
+        if (!ownTeam || (newTeam && newTeam !== ownTeam) || (currentTeam && currentTeam !== ownTeam)) {
+          throw forbidden('You can only manage members of your own team');
+        }
+      }
       await User.findByIdAndUpdate(body.user_id, { team_id: objIdOrNull(body.team_id) });
       await audit(user.email, 'update', 'User', body.user_id, { team_assigned: body.team_id });
       return 'Team member assigned.';
@@ -309,7 +345,7 @@ async function handlePostAction(req) {
     case 'save_settings': {
 
     
-      if (user.role !== 'Admin') throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (!isAdminRole(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
       const keys = ['company_name', 'currency', 'currency_symbol', 'tax_rate', 'booking_prefix', 'lead_prefix', 'default_commission'];
       for (const key of keys) {
         if (body[key] !== undefined) {
