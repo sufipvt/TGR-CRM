@@ -1,0 +1,125 @@
+    <%
+      const now = new Date();
+      const sot = new Date(); sot.setHours(0,0,0,0);
+      const eot = new Date(); eot.setHours(23,59,59,999);
+      const buckets = [
+        { key: 'overdue', label: 'Overdue', cls: 'danger', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date < sot) },
+        { key: 'today', label: 'Today', cls: 'primary', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date >= sot && f.scheduled_date <= eot) },
+        { key: 'upcoming', label: 'Upcoming', cls: 'success', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date > eot) },
+        { key: 'done', label: 'Completed / Other', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
+      ];
+    %>
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#followupModal" onclick="tgResetFollowupForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Schedule Follow-Up</button>
+    </div>
+    <% buckets.forEach(bucket => { %>
+      <div class="tg-panel mb-3">
+        <h2 class="tg-panel-title text-<%= bucket.cls %>"><%= bucket.label %> <span class="badge text-bg-<%= bucket.cls %>"><%= bucket.items.length %></span></h2>
+        <% if (!bucket.items.length) { %>
+          <p class="text-secondary mb-0" style="font-size:14px;">Nothing here.</p>
+        <% } else { %>
+          <div class="table-responsive">
+            <table class="table tg-table align-middle mb-0">
+              <thead><tr><th>Lead</th><th>Type</th><th>Owner</th><th>When</th><th>Notes</th><th>Outcome</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody>
+                <% bucket.items.forEach(f => { %>
+                  <tr>
+                    <td class="fw-medium"><%= f.lead_id ? f.lead_id.name : '—' %><div class="text-secondary" style="font-size:12px;"><%= f.lead_id ? f.lead_id.phone : '' %></div></td>
+                    <td><span class="badge text-bg-light border"><%= f.type %></span></td>
+                    <td><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
+                    <td style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
+                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
+                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.outcome || '—' %></td>
+                    <td><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
+                    <td class="text-nowrap">
+                      <% if (f.status === 'Pending') { %>
+                        <button class="btn btn-sm btn-outline-success" title="Mark done" onclick="tgCompleteFollowup('<%= f._id %>')">Done</button>
+                      <% } %>
+                      <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit follow-up"
+                        onclick='tgEditFollowup(<%- JSON.stringify({
+                          _id: String(f._id), lead_id: f.lead_id ? String(f.lead_id._id) : "",
+                          assigned_to_id: f.assigned_to_id ? String(f.assigned_to_id._id) : "",
+                          scheduled_date: f.scheduled_date ? new Date(f.scheduled_date).toISOString().slice(0,16) : "",
+                          type: f.type, status: f.status, outcome: f.outcome || "", notes: f.notes || ""
+                        }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                      <a class="btn btn-sm btn-outline-danger" href="/app?page=followups&delete=1&table=followups&id=<%= f._id %>"
+                         onclick="return confirm('Delete this follow-up?')" title="Delete" aria-label="Delete follow-up"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </div>
+    <% }) %>
+
+    <!-- Complete follow-up hidden form -->
+    <form method="POST" action="/app?page=followups" id="completeFuForm" class="d-none">
+      <input type="hidden" name="action" value="complete_followup">
+      <input type="hidden" name="followup_id" id="completeFuId">
+      <input type="hidden" name="outcome" id="completeFuOutcome">
+    </form>
+
+    <!-- Schedule/Edit Follow-Up Modal -->
+    <div class="modal fade" id="followupModal" tabindex="-1" aria-labelledby="followupModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=followups">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="followupModalTitle">Schedule Follow-Up</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_followup" id="fuAction">
+              <input type="hidden" name="followup_id" id="fuId">
+              <div class="mb-3">
+                <label class="form-label" for="fu_lead">Lead *</label>
+                <select class="form-select" id="fu_lead" name="lead_id" required>
+                  <option value="">Select lead</option>
+                  <% data.leads_for_fu.forEach(l => { %><option value="<%= l._id %>"><%= l.name %> (<%= l.phone %>)</option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="fu_type">Type</label>
+                <select class="form-select" id="fu_type" name="type">
+                  <% ['Call','WhatsApp','Site Visit','Meeting','Email','Other'].forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+                </select>
+              </div>
+              <% if (isManager) { %>
+                <div class="mb-3">
+                  <label class="form-label" for="fu_owner">Owner</label>
+                  <select class="form-select" id="fu_owner" name="assigned_to_id">
+                    <option value="">Me</option>
+                    <% data.users.forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> (<%= u.role %>)</option><% }) %>
+                  </select>
+                </div>
+              <% } %>
+              <div class="mb-3">
+                <label class="form-label" for="fu_date">Date &amp; Time *</label>
+                <input type="datetime-local" class="form-control" id="fu_date" name="scheduled_date" required>
+              </div>
+              <div class="mb-3" id="fuStatusWrap" style="display:none;">
+                <label class="form-label" for="fu_status">Status</label>
+                <select class="form-select" id="fu_status" name="status">
+                  <% ['Pending','Completed','Missed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3" id="fuOutcomeWrap" style="display:none;">
+                <label class="form-label" for="fu_outcome">Outcome</label>
+                <input class="form-control" id="fu_outcome" name="outcome">
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="fu_notes">Notes</label>
+                <textarea class="form-control" id="fu_notes" name="notes" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+

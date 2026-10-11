@@ -1,0 +1,144 @@
+    <div class="tg-panel mb-3">
+      <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-end">
+        <input type="hidden" name="page" value="reports">
+        <div><label class="form-label mb-1" for="rp_from" style="font-size:13px;">From</label><input type="date" class="form-control" id="rp_from" name="from" value="<%= data.report_from %>"></div>
+        <div><label class="form-label mb-1" for="rp_to" style="font-size:13px;">To</label><input type="date" class="form-control" id="rp_to" name="to" value="<%= data.report_to %>"></div>
+        <% if (isManager) { %>
+        <div>
+          <label class="form-label mb-1" for="rp_scope" style="font-size:13px;">Viewing</label>
+          <select class="form-select" id="rp_scope" name="scope">
+            <% if (isAdminRole) { %>
+              <option value="company" <%= data.report_scope_value === 'company' ? 'selected' : '' %>>Company-Wide</option>
+              <% (data.report_teams || []).forEach(t => { %>
+                <optgroup label="<%= t.name %>">
+                  <option value="team:<%= t._id %>" <%= data.report_scope_value === 'team:' + t._id ? 'selected' : '' %>>Whole Team — <%= t.name %></option>
+                  <% t.members.forEach(m => { %>
+                    <option value="user:<%= m._id %>" <%= data.report_scope_value === 'user:' + m._id ? 'selected' : '' %>><%= m.full_name %> (<%= m.role %>)</option>
+                  <% }) %>
+                </optgroup>
+              <% }) %>
+            <% } else { %>
+              <option value="team" <%= data.report_scope_value === 'team' ? 'selected' : '' %>>My Whole Team</option>
+              <% (data.report_team_members || []).forEach(m => { %>
+                <option value="user:<%= m._id %>" <%= data.report_scope_value === 'user:' + m._id ? 'selected' : '' %>><%= m.full_name %> (<%= m.role %>)</option>
+              <% }) %>
+            <% } %>
+          </select>
+        </div>
+        <% } %>
+        <button type="submit" class="btn btn-primary">Run</button>
+        <a class="btn btn-outline-secondary" href="/app/report-pdf?from=<%= data.report_from %>&to=<%= data.report_to %>&scope=<%= data.report_scope_value %>" target="_blank" rel="noopener">
+          <i class="fa-solid fa-file-pdf me-1" aria-hidden="true"></i>Download PDF
+        </a>
+      </form>
+      <div class="text-secondary mt-2" style="font-size:13px;">Viewing: <strong><%= data.report_scope_label %></strong></div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Lead Conversion</h2>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.total %></div><div class="tg-mini-label">Total Leads</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.qualified %></div><div class="tg-mini-label">Qualified (<%= data.conversion_report.qual_rate %>%)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.booked %></div><div class="tg-mini-label">Booked (<%= data.conversion_report.book_rate %>%)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.conversion_report.funnel.length %></div><div class="tg-mini-label">Active Statuses</div></div></div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0" style="max-width:480px;">
+          <thead><tr><th>Status</th><th>Count</th></tr></thead>
+          <tbody>
+            <% data.conversion_report.funnel.forEach(f => { %>
+              <tr><td><span class="badge text-bg-<%= statusColors[f._id] || 'secondary' %>"><%= f._id %></span></td><td><%= f.count %></td></tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Source Performance</h2>
+      <p class="text-secondary" style="font-size:13px;">Which lead sources convert well, and which give bad contact data.</p>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0">
+          <thead><tr><th>Source</th><th>Leads</th><th>Qualified</th><th>Booked</th><th>Bad Contact %</th></tr></thead>
+          <tbody>
+            <% if (!data.source_performance.length) { %>
+              <tr><td colspan="5" class="text-secondary text-center py-3">No leads in this period.</td></tr>
+            <% } %>
+            <% data.source_performance.forEach(s => { %>
+              <% const badPct = s.total ? Math.round(s.badContact / s.total * 100) : 0; %>
+              <tr>
+                <td class="fw-medium"><%= s.source[0] ? s.source[0].name : 'Unknown' %></td>
+                <td><%= s.total %></td>
+                <td><%= s.qualified %></td>
+                <td><%= s.booked %></td>
+                <td><span class="<%= badPct >= 30 ? 'text-danger fw-medium' : 'text-secondary' %>"><%= badPct %>%</span></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Loss / Not Interested Reasons</h2>
+      <p class="text-secondary" style="font-size:13px;">Why leads are being lost — helps spot pricing, project, or process issues.</p>
+      <div class="table-responsive">
+        <table class="table table-sm tg-table mb-0">
+          <thead><tr><th>Status</th><th>Reason</th><th>Count</th></tr></thead>
+          <tbody>
+            <% if (!data.loss_analysis.length) { %>
+              <tr><td colspan="3" class="text-secondary text-center py-3">No losses recorded in this period.</td></tr>
+            <% } %>
+            <% data.loss_analysis.forEach(l => { %>
+              <tr>
+                <td><span class="badge text-bg-<%= statusColors[l._id.status] || 'secondary' %>"><%= l._id.status %></span></td>
+                <td><%= l._id.reason %></td>
+                <td><%= l.count %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Follow-Up Summary</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.pending %></div><div class="tg-mini-label">Pending</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi <%= data.followup_report.overdue > 0 ? 'tg-mini-danger' : '' %>"><div class="tg-mini-value"><%= data.followup_report.overdue %></div><div class="tg-mini-label">Overdue</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.completed %></div><div class="tg-mini-label">Completed (range)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.followup_report.missed %></div><div class="tg-mini-label">Missed</div></div></div>
+      </div>
+    </div>
+
+    <div class="tg-panel mb-3">
+      <h2 class="tg-panel-title">Team Performance</h2>
+      <div class="table-responsive">
+        <table class="table tg-table mb-0">
+          <thead><tr><th>Name</th><th>Role</th><th>Leads</th><th>Qualified</th><th>Bookings</th><th>Revenue</th><th>Follow-Ups</th></tr></thead>
+          <tbody>
+            <% data.performance_report.forEach(p => { %>
+              <tr>
+                <td class="fw-medium"><%= p.name %></td>
+                <td><span class="badge text-bg-light border"><%= p.role %></span></td>
+                <td><%= p.leads %></td>
+                <td><%= p.qualified %></td>
+                <td><%= p.bookings %></td>
+                <td><%= formatMoney(p.revenue) %></td>
+                <td><%= p.followups %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="tg-panel">
+      <h2 class="tg-panel-title">Booking &amp; Revenue</h2>
+      <div class="row g-3">
+        <div class="col-6 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= data.booking_summary.count %></div><div class="tg-mini-label">Bookings</div></div></div>
+        <div class="col-6 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= formatMoney(data.booking_summary.revenue) %></div><div class="tg-mini-label">Total Revenue</div></div></div>
+        <div class="col-12 col-md-4"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= formatMoney(data.booking_summary.avg) %></div><div class="tg-mini-label">Avg Deal Size</div></div></div>
+      </div>
+    </div>
+

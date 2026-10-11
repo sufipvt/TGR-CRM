@@ -1,0 +1,20 @@
+    <div class="tg-panel">
+      <h2 class="tg-panel-title">Audit Log <span class="text-secondary fw-normal" style="font-size:13px;">(last 150 entries, auto-purged after 180 days)</span></h2>
+      <div class="tg-audit-list">
+        <% if (!data.audit_logs.length) { %><p class="text-secondary">No audit entries yet.</p><% } %>
+        <% data.audit_logs.forEach(a => { %>
+          <div class="tg-audit-item">
+            <div class="tg-audit-dot tg-audit-<%= a.action %>" aria-hidden="true"></div>
+            <div>
+              <div style="font-size:14px;">
+                <span class="fw-medium"><%= a.user_email %></span>
+                <span class="badge text-bg-light border mx-1"><%= a.action %></span>
+                <span class="text-secondary"><%= a.entity %><%= a.entity_id ? ' #' + a.entity_id.slice(-6).toUpperCase() : '' %></span>
+              </div>
+              <div class="text-secondary" style="font-size:12px;"><%= formatDateTime(a.created_at) %><%= a.details && Object.keys(a.details).length ? ' · ' + JSON.stringify(a.details) : '' %></div>
+            </div>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+  

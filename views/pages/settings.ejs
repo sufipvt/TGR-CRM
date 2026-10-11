@@ -1,0 +1,17 @@
+    <div class="tg-panel" style="max-width:640px;">
+      <h2 class="tg-panel-title">Company Settings</h2>
+      <form method="POST" action="/app?page=settings">
+        <input type="hidden" name="action" value="save_settings">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="st_company">Company Name</label><input class="form-control" id="st_company" name="company_name" value="<%= data.settings.company_name %>"></div>
+          <div class="col-md-3"><label class="form-label" for="st_currency">Currency</label><input class="form-control" id="st_currency" name="currency" value="<%= data.settings.currency %>"></div>
+          <div class="col-md-3"><label class="form-label" for="st_symbol">Symbol</label><input class="form-control" id="st_symbol" name="currency_symbol" value="<%= data.settings.currency_symbol %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_tax">Tax Rate (%)</label><input type="number" step="0.01" class="form-control" id="st_tax" name="tax_rate" value="<%= data.settings.tax_rate %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_bprefix">Booking Prefix</label><input class="form-control" id="st_bprefix" name="booking_prefix" value="<%= data.settings.booking_prefix %>"></div>
+          <div class="col-md-4"><label class="form-label" for="st_lprefix">Lead Prefix</label><input class="form-control" id="st_lprefix" name="lead_prefix" value="<%= data.settings.lead_prefix %>"></div>
+          <div class="col-md-6"><label class="form-label" for="st_comm">Default Commission (%)</label><input type="number" step="0.01" class="form-control" id="st_comm" name="default_commission" value="<%= data.settings.default_commission %>"></div>
+        </div>
+        <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
+      </form>
+    </div>
+

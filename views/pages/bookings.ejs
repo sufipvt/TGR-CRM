@@ -1,0 +1,224 @@
+    <%
+      const paidByBooking = {};
+      data.payments.forEach(p => {
+        const k = String(p.booking_id);
+        paidByBooking[k] = (paidByBooking[k] || 0) + p.amount;
+      });
+    %>
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="search" id="bookingSearch" class="form-control" style="max-width:240px;" placeholder="Search lead / project / unit" aria-label="Search bookings">
+        <select id="bookingStatusFilter" class="form-select" style="max-width:160px;" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <% ['Tentative','Confirmed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+        </select>
+        <div class="ms-auto d-flex gap-2">
+          <button class="btn btn-outline-secondary" onclick="tgExportBookingsCsv()"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Export CSV</button>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookingModal" onclick="tgResetBookingForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Booking</button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table tg-table align-middle" id="bookingsTable">
+          <thead><tr><th>ID</th><th>Lead</th><th>Project</th><th>Unit</th><th>Closer</th><th>Sale Value</th><th>Booking Amt</th><th>Paid</th><th>Balance</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (!data.bookings.length) { %>
+              <tr><td colspan="12" class="text-secondary text-center py-4">No bookings yet.</td></tr>
+            <% } %>
+            <% data.bookings.forEach(b => {
+              const paid = paidByBooking[String(b._id)] || 0;
+              const balance = (b.sale_value || 0) - paid;
+            %>
+              <tr data-status="<%= b.status %>" data-search="<%= ((b.lead_id ? b.lead_id.name : '') + ' ' + (b.project_id ? b.project_id.name : '') + ' ' + (b.unit_id ? b.unit_id.unit_number : '')).toLowerCase() %>">
+                <td class="fw-medium">TG-<%= String(b._id).slice(-8).toUpperCase() %></td>
+                <td><%= b.lead_id ? b.lead_id.name : '—' %></td>
+                <td><%= b.project_id ? b.project_id.name : '—' %></td>
+                <td><%= b.unit_id ? b.unit_id.unit_number : '—' %></td>
+                <td><%= b.closer_id ? b.closer_id.full_name : '—' %></td>
+                <td><%= formatMoney(b.sale_value) %></td>
+                <td><%= formatMoney(b.booking_amount) %></td>
+                <td class="text-success"><%= formatMoney(paid) %></td>
+                <td class="<%= balance > 0 ? 'text-danger' : 'text-success' %>"><%= formatMoney(balance) %></td>
+                <td><span class="badge text-bg-<%= b.status === 'Confirmed' ? 'success' : (b.status === 'Cancelled' ? 'danger' : 'warning') %>"><%= b.status %></span></td>
+                <td style="font-size:13px;"><%= formatDate(b.booking_date) %></td>
+                <td class="text-nowrap">
+                  <a class="btn btn-sm btn-outline-secondary" href="/app/receipt/<%= b._id %>" target="_blank" rel="noopener" title="Receipt" aria-label="View receipt"><i class="fa-solid fa-receipt" aria-hidden="true"></i></a>
+                  <button class="btn btn-sm btn-outline-success" title="Add payment" onclick="tgPayBooking('<%= b._id %>', '<%= b.lead_id ? b.lead_id.name.replace(/'/g,'') : '' %>')">Pay</button>
+                  <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit booking"
+                    onclick='tgEditBooking(<%- JSON.stringify({
+                      _id: String(b._id), sale_value: b.sale_value, booking_amount: b.booking_amount,
+                      booking_date: b.booking_date ? new Date(b.booking_date).toISOString().slice(0,10) : "",
+                      status: b.status, notes: b.notes || ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=bookings&delete=1&table=bookings&id=<%= b._id %>"
+                     onclick="return confirm('Delete this booking? Unit will be released and lead returned to Negotiation.')" title="Delete" aria-label="Delete booking"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add Booking Modal -->
+    <div class="modal fade" id="bookingModal" tabindex="-1" aria-labelledby="bookingModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="bookingModalTitle">Add Booking</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_booking">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_lead">Lead *</label>
+                  <select class="form-select" id="bk_lead" name="lead_id" required>
+                    <option value="">Select qualified lead</option>
+                    <% data.qualified_leads.forEach(l => { %><option value="<%= l._id %>"><%= l.name %> (<%= l.phone %>)</option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_project">Project *</label>
+                  <select class="form-select" id="bk_project" name="project_id" required onchange="tgLoadUnits(this.value)">
+                    <option value="">Select project</option>
+                    <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_unit">Unit *</label>
+                  <select class="form-select" id="bk_unit" name="unit_id" required>
+                    <option value="">Select project first</option>
+                  </select>
+                </div>
+                <% if (isManager) { %>
+                  <div class="col-md-6">
+                    <label class="form-label" for="bk_closer">Closer</label>
+                    <select class="form-select" id="bk_closer" name="closer_id">
+                      <option value="">Me</option>
+                      <% data.closers.forEach(c => { %><option value="<%= c._id %>"><%= c.full_name %></option><% }) %>
+                    </select>
+                  </div>
+                <% } %>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_sale">Sale Value (INR) *</label>
+                  <input type="number" class="form-control" id="bk_sale" name="sale_value" min="0" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_amount">Booking Amount (INR) *</label>
+                  <input type="number" class="form-control" id="bk_amount" name="booking_amount" min="0" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_date">Booking Date</label>
+                  <input type="date" class="form-control" id="bk_date" name="booking_date">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="bk_status">Status</label>
+                  <select class="form-select" id="bk_status" name="status">
+                    <% ['Tentative','Confirmed'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label" for="bk_notes">Notes</label>
+                  <textarea class="form-control" id="bk_notes" name="notes" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Create Booking</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit Booking Modal -->
+    <div class="modal fade" id="editBookingModal" tabindex="-1" aria-labelledby="editBookingTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="editBookingTitle">Edit Booking</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="update_booking">
+              <input type="hidden" name="booking_id" id="eb_id">
+              <div class="mb-3">
+                <label class="form-label" for="eb_sale">Sale Value (INR)</label>
+                <input type="number" class="form-control" id="eb_sale" name="sale_value" min="0">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_amount">Booking Amount (INR)</label>
+                <input type="number" class="form-control" id="eb_amount" name="booking_amount" min="0">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_date">Booking Date</label>
+                <input type="date" class="form-control" id="eb_date" name="booking_date">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="eb_status">Status</label>
+                <select class="form-select" id="eb_status" name="status">
+                  <% ['Tentative','Confirmed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="eb_notes">Notes</label>
+                <textarea class="form-control" id="eb_notes" name="notes" rows="2"></textarea>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Payment Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=bookings">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="paymentModalTitle">Add Payment</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_payment">
+              <input type="hidden" name="booking_id" id="pm_booking">
+              <div class="mb-3">
+                <label class="form-label" for="pm_amount">Amount (INR) *</label>
+                <input type="number" class="form-control" id="pm_amount" name="amount" min="1" required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_date">Payment Date</label>
+                <input type="date" class="form-control" id="pm_date" name="payment_date">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_method">Method</label>
+                <select class="form-select" id="pm_method" name="method">
+                  <% ['Bank Transfer','UPI','Cheque','Cash','Card','Other'].forEach(m => { %><option value="<%= m %>"><%= m %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="pm_ref">Reference</label>
+                <input class="form-control" id="pm_ref" name="reference" placeholder="Txn ID / Cheque no.">
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="pm_notes">Notes</label>
+                <input class="form-control" id="pm_notes" name="notes">
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Record Payment</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+

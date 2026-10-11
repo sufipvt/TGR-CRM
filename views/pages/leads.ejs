@@ -1,0 +1,485 @@
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <input type="search" id="leadSearch" class="form-control" style="max-width:240px;" placeholder="Search name / phone / email" aria-label="Search leads">
+        <select id="leadStatusFilter" class="form-select" style="max-width:180px;" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+        </select>
+        <select id="leadSourceFilter" class="form-select" style="max-width:180px;" aria-label="Filter by source">
+          <option value="">All Sources</option>
+          <% data.sources.forEach(s => { %><option value="<%= s.name %>"><%= s.name %></option><% }) %>
+        </select>
+        <select id="leadProjectFilter" class="form-select" style="max-width:180px;" aria-label="Filter by project">
+          <option value="">All Projects</option>
+          <% data.projects.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %>
+        </select>
+        <select id="leadTemperatureFilter" class="form-select" style="max-width:160px;" aria-label="Filter by temperature">
+          <option value="">All Temperatures</option>
+          <option value="Hot">🔥 Hot</option>
+          <option value="Warm">☀️ Warm</option>
+          <option value="Cold">❄️ Cold</option>
+        </select>
+        <div class="ms-auto d-flex gap-2">
+          <div class="btn-group" role="group" aria-label="View toggle">
+            <button id="tgViewTable" type="button" class="btn btn-sm btn-primary"
+              onclick="tgSetView('table')" title="Table view">
+              <i class="fa-solid fa-table-list" aria-hidden="true"></i>
+            </button>
+            <button id="tgViewKanban" type="button" class="btn btn-sm btn-outline-secondary"
+              onclick="tgSetView('kanban')" title="Kanban view">
+              <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+            </button>
+          </div>
+          <% if (isManager) { %>
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal"><i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import CSV</button>
+          <% } %>
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal" onclick="tgResetLeadForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Lead</button>
+        </div>
+      </div>
+
+      <div id="tgTableView">
+      <div class="table-responsive">
+        <table class="table tg-table align-middle" id="leadsTable">
+          <thead>
+            <tr><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Temp</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            <% if (!data.leads.length) { %>
+              <tr><td colspan="9" class="text-secondary text-center py-4">No leads found. Add your first lead to get started.</td></tr>
+            <% } %>
+            <% data.leads.forEach(lead => { %>
+              <%
+                const canEdit = isManager || String(lead.assigned_caller_id?._id || '') === user.userId || String(lead.assigned_closer_id?._id || '') === user.userId;
+              %>
+             <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+                  data-temperature="<%= lead.temperature || '' %>"
+                  data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
+                <td>
+                  <div class="fw-medium"><%= lead.name %></div>
+                  <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
+                </td>
+                <td>
+                  <%= lead.phone %>
+                  <% if (['Not Reachable','Switched Off','Call Rejected','Invalid Number'].includes(lead.contact_outcome)) { %>
+                    <i class="fa-solid fa-phone-slash text-danger ms-1" title="<%= lead.contact_outcome %>" aria-hidden="true"></i>
+                  <% } %>
+                </td>
+      
+                <td><%= lead.source_id ? lead.source_id.name : '—' %></td>
+                <td><%= lead.project_id ? lead.project_id.name : '—' %></td>
+                <td><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
+               <td><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
+                <td>
+                  <% if (lead.temperature === 'Hot') { %><span class="badge text-bg-danger">🔥 Hot</span><% } %>
+                  <% if (lead.temperature === 'Warm') { %><span class="badge text-bg-warning">☀️ Warm</span><% } %>
+                  <% if (lead.temperature === 'Cold') { %><span class="badge text-bg-info">❄️ Cold</span><% } %>
+                  <% if (!lead.temperature) { %><span class="text-secondary">—</span><% } %>
+                </td>
+                <td><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
+                <td class="text-nowrap">
+                  <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
+                     href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
+                     title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
+                  <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
+                  <% if (canEdit) { %>
+                    <button type="button" class="btn btn-sm btn-outline-danger" title="Not Interested"
+                      onclick='tgShowNiModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'>NI</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Could not connect" aria-label="Log contact attempt"
+                      onclick='tgShowContactOutcomeModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'><i class="fa-solid fa-phone-slash" aria-hidden="true"></i></button>
+                    <form method="POST" action="/app?page=leads" style="display:inline">
+                      <input type="hidden" name="action" value="quick_disposition">
+                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
+                      <input type="hidden" name="status" value="Working">
+                      <button type="submit" class="btn btn-sm btn-outline-warning" title="Call Back / Working">CB</button>
+                    </form>
+                    <form method="POST" action="/app?page=leads" style="display:inline">
+                      <input type="hidden" name="action" value="quick_disposition">
+                      <input type="hidden" name="lead_id" value="<%= lead._id %>">
+                      <input type="hidden" name="status" value="Qualified">
+                      <button type="submit" class="btn btn-sm btn-outline-success" title="Interested / Qualified">INT</button>
+                    </form>
+                    <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead"
+                    onclick='tgEditLead(<%- JSON.stringify({
+                      _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
+                      source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
+                      budget_range: lead.budget_range || "", status: lead.status,
+                      temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
+                      assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
+                      assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
+                      notes: lead.notes || ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <% } %>
+                  <% if (isManager) { %>
+                    <a class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"
+                       href="/app?page=leads&delete=1&table=leads&id=<%= lead._id %>"
+                       onclick="return confirm('Delete this lead?')"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div><!-- closes table-responsive -->
+      </div><!-- closes tgTableView -->
+
+      <!-- ===== KANBAN VIEW ===== -->
+      <div id="tgKanbanView" style="display:none; overflow-x:auto;">
+        <div style="display:flex; gap:12px; padding-bottom:8px; min-width:max-content; align-items:flex-start;">
+          <%
+            const KANBAN_COLS = ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'];
+          %>
+          <% KANBAN_COLS.forEach(colStatus => {
+            const colLeads = data.leads.filter(l => l.status === colStatus);
+          %>
+            <div class="tg-kanban-col" data-status="<%= colStatus %>">
+              <span class="badge text-bg-<%= statusColors[colStatus] || 'secondary' %> d-flex justify-content-between align-items-center mb-2"
+                    style="font-size:12px; padding:8px 10px; border-radius:8px;">
+                <span><%= colStatus %></span>
+                <span class="tg-kanban-count" id="kcount_<%= colStatus.replace(/ /g,'_') %>"><%= colLeads.length %></span>
+              </span>
+              <div class="tg-kanban-cards"
+                   id="kcol_<%= colStatus.replace(/ /g,'_') %>"
+                   ondragover="event.preventDefault(); this.classList.add('drag-over')"
+                   ondragleave="this.classList.remove('drag-over')"
+                   ondrop="tgKanbanDrop(event, this, '<%= colStatus %>')">
+                <% colLeads.forEach(lead => {
+                  const canEditCard = isManager ||
+                    String(lead.assigned_caller_id?._id || '') === user.userId ||
+                    String(lead.assigned_closer_id?._id || '') === user.userId;
+                  const ageDays = Math.floor((Date.now() - new Date(lead.created_at)) / 86400000);
+                %>
+                  <div class="tg-kanban-card <%= ageDays >= 7 ? 'tg-kanban-stale' : '' %>"
+                     draggable="<%= canEditCard ? 'true' : 'false' %>"
+                     data-id="<%= lead._id %>"
+                     data-status="<%= lead.status %>"
+                     data-source="<%= lead.source_id ? lead.source_id.name : '' %>"
+                     data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
+                     data-temperature="<%= lead.temperature || '' %>"
+                     data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>"
+                       ondragstart="tgKanbanDragStart(event)"
+                       ondragend="this.classList.remove('dragging')">
+                    <div class="fw-semibold" style="font-size:13px;">
+                    <%= lead.name %>
+                    <% if (lead.temperature === 'Hot') { %><i class="fa-solid fa-fire text-danger" title="Hot lead" aria-hidden="true"></i><% } %>
+                    <% if (lead.temperature === 'Warm') { %><i class="fa-solid fa-sun text-warning" title="Warm lead" aria-hidden="true"></i><% } %>
+                    <% if (lead.temperature === 'Cold') { %><i class="fa-solid fa-snowflake text-info" title="Cold lead" aria-hidden="true"></i><% } %>
+                    <% if (ageDays >= 7) { %>
+                      <span style="color:#f59e0b;" title="<%= ageDays %> days old">⚠</span>
+                    <% } %>
+                  </div>
+                    <div style="font-size:12px; color:#6b7280; margin-top:2px;">
+                    <i class="fa-solid fa-phone" style="font-size:9px;" aria-hidden="true"></i> <%= lead.phone %>
+                    <% if (['Not Reachable','Switched Off','Call Rejected','Invalid Number'].includes(lead.contact_outcome)) { %>
+                      <i class="fa-solid fa-phone-slash text-danger ms-1" style="font-size:9px;" title="<%= lead.contact_outcome %>" aria-hidden="true"></i>
+                    <% } %>
+                  </div>
+                    <% if (lead.project_id) { %>
+                      <div style="font-size:11px; color:var(--brand); margin-top:4px;">
+                        <i class="fa-solid fa-building" style="font-size:9px;" aria-hidden="true"></i>
+                        <%= lead.project_id.name %>
+                      </div>
+                    <% } %>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                      <% if (lead.source_id) { %>
+                        <span style="font-size:10px; background:#f1f5f9; border-radius:4px; padding:1px 5px;">
+                          <%= lead.source_id.name %>
+                        </span>
+                      <% } else { %><span></span><% } %>
+                      <span style="font-size:10px; <%= ageDays >= 7 ? 'color:#dc2626; font-weight:600;' : 'color:#6b7280;' %>">
+                        <%= ageDays %>d
+                      </span>
+                    </div>
+                    <% if (canEditCard) { %>
+                      <div class="tg-kanban-card-actions">
+                        <button class="btn btn-sm py-0 px-1 btn-outline-primary" title="Edit" aria-label="Edit lead"
+                          onclick='tgEditLead(<%- JSON.stringify({
+                            _id: String(lead._id), name: lead.name, phone: lead.phone,
+                            email: lead.email || "", city: lead.city || "",
+                            source_id: lead.source_id ? String(lead.source_id._id) : "",
+                            project_id: lead.project_id ? String(lead.project_id._id) : "",
+                            budget_range: lead.budget_range || "", status: lead.status,
+                            temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
+                            assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
+                            assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
+                            notes: lead.notes || ""
+                          }) %>)'>
+                          <i class="fa-solid fa-pen" style="font-size:10px;" aria-hidden="true"></i>
+                        </button>
+                        <a class="btn btn-sm py-0 px-1 btn-outline-success" target="_blank" rel="noopener"
+                           title="WhatsApp" aria-label="WhatsApp"
+                           href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>">
+                          <i class="fa-brands fa-whatsapp" style="font-size:10px;" aria-hidden="true"></i>
+                        </a>
+                      </div>
+                    <% } %>
+                  </div>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+      <!-- ===== END KANBAN VIEW ===== -->
+
+    </div><!-- closes tg-panel -->
+
+    <!-- Add/Edit Lead Modal -->
+    <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=leads">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="leadModalTitle">Add Lead</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_lead" id="leadAction">
+              <input type="hidden" name="lead_id" id="leadId">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_name">Name *</label>
+                  <input class="form-control" id="lf_name" name="name" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_phone">Phone *</label>
+                  <input class="form-control" id="lf_phone" name="phone" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_email">Email</label>
+                  <input type="email" class="form-control" id="lf_email" name="email">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_city">City</label>
+                  <input class="form-control" id="lf_city" name="city">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_source">Source *</label>
+                  <select class="form-select" id="lf_source" name="source_id" required>
+                    <option value="">Select source</option>
+                    <% data.sources.forEach(s => { %><option value="<%= s._id %>"><%= s.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_project">Project</label>
+                  <select class="form-select" id="lf_project" name="project_id">
+                    <option value="">None</option>
+                    <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_budget">Budget Range</label>
+                  <input class="form-control" id="lf_budget" name="budget_range" placeholder="e.g. 50L - 80L">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_status">Status</label>
+                  <select class="form-select" id="lf_status" name="status" onchange="tgToggleDispositionReason()">
+                    <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="lf_temperature">Temperature</label>
+                  <select class="form-select" id="lf_temperature" name="temperature">
+                    <option value="">Not set</option>
+                    <option value="Hot">🔥 Hot</option>
+                    <option value="Warm">☀️ Warm</option>
+                    <option value="Cold">❄️ Cold</option>
+                  </select>
+                </div>
+                <div class="col-12" id="lf_reason_wrap" style="display:none;">
+                  <label class="form-label" for="lf_reason">Reason</label>
+                  <select class="form-select" id="lf_reason" name="disposition_reason">
+                    <option value="">Select reason</option>
+                  </select>
+                  <div class="text-secondary mt-1" style="font-size:12px;">Shown for Not Interested / Lost — feeds the Loss Analysis report.</div>
+                </div>
+                <% if (isManager) { %>
+                  <div class="col-md-6">
+                    <label class="form-label" for="lf_caller">Assigned Agent <span class="text-secondary">(auto round-robin if blank)</span></label>
+                    <select class="form-select" id="lf_caller" name="assigned_caller_id">
+                      <option value="">Auto-assign</option>
+                      <% data.users.filter(u => ['Team Leader','Sub Team Leader'].includes(u.role)).forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> <%= u.role === 'Team Leader' ? '(TL)' : '' %></option><% }) %>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label" for="lf_closer">Backup / Co-Agent <span class="text-secondary">(optional)</span></label>
+                    <select class="form-select" id="lf_closer" name="assigned_closer_id">
+                      <option value="">None</option>
+                      <% data.users.filter(u => ['Team Leader','Sub Team Leader'].includes(u.role)).forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %> <%= u.role === 'Team Leader' ? '(TL)' : '' %></option><% }) %>
+                    </select>
+                  </div>
+                <% } %>
+                <div class="col-12">
+                  <label class="form-label" for="lf_notes">Notes</label>
+                  <textarea class="form-control" id="lf_notes" name="notes" rows="2"></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Lead</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <% if (isManager) { %>
+    <!-- Import CSV Modal — Smart Column Mapper -->
+    <div class="modal fade" id="importCsvModal" tabindex="-1" aria-labelledby="importCsvTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+
+          <!-- STEP 1: Upload -->
+          <div id="importStep1">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="importCsvTitle">
+                <i class="fa-solid fa-file-import me-2" aria-hidden="true"></i>Import Leads
+              </h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="alert alert-info py-2 mb-3" style="font-size:13px;">
+                <i class="fa-solid fa-circle-info me-1"></i>
+                <strong>Works with any format</strong> — upload your file as-is from
+                99acres, MagicBricks, Facebook Ads, Housing.com or your own Excel sheet.
+                We detect your columns automatically.
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-medium" for="importFileInput">Choose your CSV file</label>
+                <input type="file" class="form-control" id="importFileInput" accept=".csv" aria-label="CSV file">
+                <div class="text-secondary mt-1" style="font-size:12px;">
+                  Max 5MB · Any column names accepted · Leads auto-assigned to callers
+                </div>
+              </div>
+              <div style="font-size:13px;">
+                <span class="text-secondary">Prefer our standard template?</span>
+                <a href="#" onclick="tgDownloadSampleCsv(); return false;" class="ms-1">Download it here</a>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" onclick="tgShowColumnMapper()">
+                Next — Map Columns <i class="fa-solid fa-arrow-right ms-1" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: Column Mapper -->
+          <div id="importStep2" style="display:none;">
+            <form method="POST" action="/app/import-leads" enctype="multipart/form-data" id="importMappingForm">
+              <div class="modal-header">
+                <div>
+                  <h2 class="modal-title h5">Map Your Columns</h2>
+                  <div class="text-secondary" style="font-size:12px;" id="importFileLabel"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body" style="max-height:420px; overflow-y:auto;">
+                <p class="text-secondary mb-3" style="font-size:13px;">
+                  We've auto-detected your columns below. Adjust any that look wrong.
+                  <strong>Name</strong> and <strong>Phone</strong> are required — everything else is optional.
+                </p>
+                <table class="table table-sm table-bordered mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th style="width:30%;">CRM Field</th>
+                      <th style="width:40%;">Your Column</th>
+                      <th>Preview (row 1)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="importMapperBody">
+                    <!-- Filled by JS -->
+                  </tbody>
+                </table>
+                <input type="hidden" name="column_mapping" id="importMappingJson">
+                <input type="file" name="csv_file" id="importHiddenFile" style="display:none;" aria-hidden="true">
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" onclick="tgBackToStep1()">
+                  <i class="fa-solid fa-arrow-left me-1" aria-hidden="true"></i>Back
+                </button>
+                <button type="submit" class="btn btn-primary" onclick="return tgPrepareImport()">
+                  <i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import Leads
+                </button>
+              </div>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </div>
+    <% } %>
+
+    <!-- Timeline Offcanvas -->
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="timelineOffcanvas" aria-labelledby="timelineTitle">
+      <div class="offcanvas-header">
+        <h2 class="offcanvas-title h5" id="timelineTitle">Lead Timeline</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+      </div>
+      <div class="offcanvas-body" id="timelineBody">
+        <p class="text-secondary">Loading…</p>
+      </div>
+    </div>
+
+    <!-- Not Interested Reason Modal -->
+    <div class="modal fade" id="niModal" tabindex="-1" aria-labelledby="niModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="niModalTitle">Mark Not Interested</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="fw-medium mb-3" id="niLeadName" style="font-size:14px;"></p>
+            <label class="form-label" for="niReasonSelect">Reason</label>
+            <select class="form-select" id="niReasonSelect">
+              <option value="">Select reason (optional)</option>
+              <% ['Budget Mismatch','Location Mismatch','Timeline Mismatch (not buying soon)','Property Type Mismatch','Already Purchased Elsewhere','Other'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+            </select>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn btn-danger" id="confirmNiBtn"><i class="fa-solid fa-ban me-1" aria-hidden="true"></i>Mark Not Interested</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden form for NI submission -->
+    <form method="POST" action="/app?page=leads" id="niForm" class="d-none">
+      <input type="hidden" name="action" value="quick_disposition">
+      <input type="hidden" name="lead_id" id="niLeadId">
+      <input type="hidden" name="status" value="Not Interested">
+      <input type="hidden" name="disposition_reason" id="niReason">
+    </form>
+
+    <!-- Contact Outcome Modal -->
+    <div class="modal fade" id="contactOutcomeModal" tabindex="-1" aria-labelledby="contactOutcomeModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2 class="modal-title h5" id="contactOutcomeModalTitle">Log Contact Attempt</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="fw-medium mb-3" id="coLeadName" style="font-size:14px;"></p>
+            <div class="d-flex flex-column gap-2">
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Not Reachable')"><i class="fa-solid fa-phone-slash me-2" aria-hidden="true"></i>Not Reachable</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Switched Off')"><i class="fa-solid fa-power-off me-2" aria-hidden="true"></i>Switched Off</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Call Rejected')"><i class="fa-solid fa-phone-slash me-2" aria-hidden="true"></i>Call Rejected / Cut</button>
+              <button type="button" class="btn btn-outline-secondary text-start" onclick="tgSubmitContactOutcome('Invalid Number')"><i class="fa-solid fa-triangle-exclamation me-2" aria-hidden="true"></i>Invalid Number</button>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form method="POST" action="/app?page=leads" id="coForm" class="d-none">
+      <input type="hidden" name="action" value="quick_contact_outcome">
+      <input type="hidden" name="lead_id" id="coLeadId">
+      <input type="hidden" name="contact_outcome" id="coOutcome">
+    </form>
+

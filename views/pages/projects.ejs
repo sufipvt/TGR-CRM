@@ -1,0 +1,158 @@
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#projectModal" onclick="tgResetProjectForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Project</button>
+    </div>
+    <div class="row g-3">
+      <% if (!data.projects_detail.length) { %>
+        <div class="col-12"><div class="tg-panel text-center text-secondary py-5">No projects yet. Add your first project.</div></div>
+      <% } %>
+      <% data.projects_detail.forEach(p => {
+        const pUnits = data.units.filter(u => String(u.project_id) === String(p._id));
+      %>
+        <div class="col-md-6 col-xl-4">
+          <div class="tg-panel h-100">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <h2 class="h6 fw-bold mb-1"><%= p.name %></h2>
+                <div class="text-secondary" style="font-size:13px;"><%= p.developer || '—' %> · <%= [p.location, p.city].filter(Boolean).join(', ') || '—' %></div>
+              </div>
+              <span class="badge text-bg-<%= p.status === 'Ready to Move' ? 'success' : (p.status === 'Sold Out' ? 'danger' : 'info') %>"><%= p.status %></span>
+            </div>
+            <div class="d-flex flex-wrap gap-2 mb-3" style="font-size:13px;">
+              <span class="badge text-bg-light border"><%= p.project_type || 'Other' %></span>
+              <span class="text-secondary">
+                <%= pUnits.length > 0
+                ? pUnits.filter(u => u.status === 'Available').length + '/' + pUnits.length + ' units listed'
+                : p.available_units + '/' + p.total_units + ' units available'
+                %>
+              </span>
+              <% if (p.price_range) { %><span class="text-secondary"><%= p.price_range %></span><% } %>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#units-<%= p._id %>">Manage Units (<%= pUnits.length %>)</button>
+              <button class="btn btn-sm btn-outline-primary" aria-label="Edit project"
+                onclick='tgEditProject(<%- JSON.stringify({
+                  _id: String(p._id), name: p.name, developer: p.developer || "", location: p.location || "",
+                  city: p.city || "", state: p.state || "", project_type: p.project_type || "Other",
+                  status: p.status, total_units: p.total_units, available_units: p.available_units,
+                  price_range: p.price_range || "", notes: p.notes || ""
+                }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+              <a class="btn btn-sm btn-outline-danger" href="/app?page=projects&delete=1&table=projects&id=<%= p._id %>"
+                 onclick="return confirm('Delete this project?')" aria-label="Delete project"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+            </div>
+            <div class="collapse mt-3" id="units-<%= p._id %>">
+              <div class="table-responsive">
+                <table class="table table-sm tg-table mb-2">
+                  <thead><tr><th>Unit</th><th>BHK</th><th>Sqft</th><th>Price</th><th>Status</th><th></th></tr></thead>
+                  <tbody>
+                    <% if (!pUnits.length) { %><tr><td colspan="6" class="text-secondary" style="font-size:13px;">No units.</td></tr><% } %>
+                    <% pUnits.forEach(u => { %>
+                      <tr>
+                        <td><%= u.unit_number %></td>
+                        <td><%= u.bhk || '—' %></td>
+                        <td><%= u.area_sqft || '—' %></td>
+                        <td style="font-size:13px;"><%= formatMoney(u.base_price) %></td>
+                        <td><span class="badge text-bg-<%= u.status === 'Available' ? 'success' : (u.status === 'Sold' || u.status === 'Booked' ? 'danger' : 'warning') %>" style="font-size:10px;"><%= u.status %></span></td>
+                        <td class="text-nowrap">
+                          <button class="btn btn-sm btn-outline-primary py-0 px-1" aria-label="Edit unit"
+                            onclick='tgEditUnit(<%- JSON.stringify({
+                              _id: String(u._id), project_id: String(u.project_id), unit_number: u.unit_number,
+                              type: u.type || "", bhk: u.bhk || "", area_sqft: u.area_sqft || 0,
+                              base_price: u.base_price || 0, status: u.status, notes: u.notes || ""
+                            }) %>)'><i class="fa-solid fa-pen" style="font-size:11px;" aria-hidden="true"></i></button>
+                          <a class="btn btn-sm btn-outline-danger py-0 px-1" href="/app?page=projects&delete=1&table=units&id=<%= u._id %>"
+                             onclick="return confirm('Delete unit?')" aria-label="Delete unit"><i class="fa-solid fa-trash" style="font-size:11px;" aria-hidden="true"></i></a>
+                        </td>
+                      </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+              <button class="btn btn-sm btn-outline-primary" onclick="tgAddUnit('<%= p._id %>')"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Unit</button>
+            </div>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+
+    <!-- Project Modal -->
+    <div class="modal fade" id="projectModal" tabindex="-1" aria-labelledby="projectModalTitle" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=projects">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="projectModalTitle">Add Project</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_project" id="prAction">
+              <input type="hidden" name="project_id" id="prId">
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="pr_name">Name *</label><input class="form-control" id="pr_name" name="name" required></div>
+                <div class="col-md-6"><label class="form-label" for="pr_dev">Developer</label><input class="form-control" id="pr_dev" name="developer"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_loc">Location</label><input class="form-control" id="pr_loc" name="location"></div>
+                <div class="col-md-3"><label class="form-label" for="pr_city">City</label><input class="form-control" id="pr_city" name="city"></div>
+                <div class="col-md-3"><label class="form-label" for="pr_state">State</label><input class="form-control" id="pr_state" name="state"></div>
+                <div class="col-md-4">
+                  <label class="form-label" for="pr_type">Type</label>
+                  <select class="form-select" id="pr_type" name="project_type">
+                    <% ['Apartment','Villa','Plot','Commercial','Penthouse','Studio','Other'].forEach(t => { %><option value="<%= t %>"><%= t %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label" for="pr_status">Status</label>
+                  <select class="form-select" id="pr_status" name="status">
+                    <% ['Upcoming','Under Construction','Ready to Move','Sold Out'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-md-4"><label class="form-label" for="pr_price">Price Range</label><input class="form-control" id="pr_price" name="price_range" placeholder="e.g. 60L - 1.2Cr"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_total">Total Units</label><input type="number" class="form-control" id="pr_total" name="total_units" min="0"></div>
+                <div class="col-md-6"><label class="form-label" for="pr_avail">Available Units</label><input type="number" class="form-control" id="pr_avail" name="available_units" min="0"></div>
+                <div class="col-12"><label class="form-label" for="pr_notes">Notes</label><textarea class="form-control" id="pr_notes" name="notes" rows="2"></textarea></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Project</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unit Modal -->
+    <div class="modal fade" id="unitModal" tabindex="-1" aria-labelledby="unitModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=projects">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="unitModalTitle">Add Unit</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_unit" id="unAction">
+              <input type="hidden" name="unit_id" id="unId">
+              <input type="hidden" name="project_id" id="unProjectId">
+              <div class="row g-3">
+                <div class="col-md-6"><label class="form-label" for="un_number">Unit Number *</label><input class="form-control" id="un_number" name="unit_number" required></div>
+                <div class="col-md-6"><label class="form-label" for="un_type">Type</label><input class="form-control" id="un_type" name="type" placeholder="e.g. Apartment"></div>
+                <div class="col-md-4"><label class="form-label" for="un_bhk">BHK</label><input class="form-control" id="un_bhk" name="bhk" placeholder="e.g. 3BHK"></div>
+                <div class="col-md-4"><label class="form-label" for="un_area">Area (sqft)</label><input type="number" class="form-control" id="un_area" name="area_sqft" min="0"></div>
+                <div class="col-md-4"><label class="form-label" for="un_price">Base Price (INR)</label><input type="number" class="form-control" id="un_price" name="base_price" min="0"></div>
+                <div class="col-md-6">
+                  <label class="form-label" for="un_status">Status</label>
+                  <select class="form-select" id="un_status" name="status">
+                    <% ['Available','Blocked','Booked','Sold'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                  </select>
+                </div>
+                <div class="col-12"><label class="form-label" for="un_notes">Notes</label><input class="form-control" id="un_notes" name="notes"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Unit</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
