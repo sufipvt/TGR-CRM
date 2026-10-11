@@ -1,0 +1,63 @@
+    <div class="tg-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="tg-panel-title mb-0">Lead Sources</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sourceModal" onclick="tgResetSourceForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Source</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table tg-table align-middle mb-0">
+          <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (!data.sources.length) { %><tr><td colspan="5" class="text-secondary text-center py-4">No sources yet.</td></tr><% } %>
+            <% data.sources.forEach(s => { %>
+              <tr>
+                <td class="fw-medium"><%= s.name %></td>
+                <td><span class="badge text-bg-light border"><%= s.channel || '—' %></span></td>
+                <td><span class="badge text-bg-<%= s.active ? 'success' : 'secondary' %>"><%= s.active ? 'Active' : 'Inactive' %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= s.notes || '—' %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" aria-label="Edit source"
+                    onclick='tgEditSource(<%- JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=sources&delete=1&table=sources&id=<%= s._id %>"
+                     onclick="return confirm('Delete this source?')" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Source Modal -->
+    <div class="modal fade" id="sourceModal" tabindex="-1" aria-labelledby="sourceModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=sources">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="sourceModalTitle">Add Source</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_source" id="srAction">
+              <input type="hidden" name="source_id" id="srId">
+              <div class="mb-3"><label class="form-label" for="sr_name">Name *</label><input class="form-control" id="sr_name" name="name" required placeholder="e.g. 99acres, Facebook Ads"></div>
+              <div class="mb-3">
+                <label class="form-label" for="sr_channel">Channel</label>
+                <select class="form-select" id="sr_channel" name="channel">
+                  <% ['Online','Offline','Referral','Direct'].forEach(c => { %><option value="<%= c %>"><%= c %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="sr_active" name="active" value="true" checked>
+                <label class="form-check-label" for="sr_active">Active</label>
+              </div>
+              <div class="mb-0"><label class="form-label" for="sr_notes">Notes</label><input class="form-control" id="sr_notes" name="notes"></div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save Source</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+

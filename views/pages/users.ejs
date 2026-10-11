@@ -1,0 +1,87 @@
+    <div class="tg-panel">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="tg-panel-title mb-0">Users</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="tgResetUserForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add User</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table tg-table align-middle mb-0">
+          <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Team</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+          <tbody>
+            <% if (!data.users.length) { %><tr><td colspan="8" class="text-secondary text-center py-4">No users yet.</td></tr><% } %>
+            <% data.users.forEach(u => { %>
+              <tr>
+                <td class="fw-medium"><%= u.full_name %></td>
+                <td><%= u.email %></td>
+                <td><%= u.phone || '—' %></td>
+                <td><span class="badge text-bg-<%= u.role === 'Super Admin' ? 'dark' : (u.role === 'Admin' ? 'primary' : (u.role === 'Team Leader' ? 'warning' : 'info')) %>"><%= u.role %></span></td>
+                <td>
+                  <% if (u.team_id) { %>
+                    <span class="badge text-bg-light border"><%= u.team_id.name %></span>
+                  <% } else { %>
+                    <span class="text-secondary">—</span>
+                  <% } %>
+                </td>
+                <td><span class="badge text-bg-<%= u.status === 'Active' ? 'success' : 'secondary' %>"><%= u.status %></span></td>
+                <td class="text-secondary" style="font-size:13px;"><%= formatDate(u.created_at) %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" aria-label="Edit user"
+                    onclick='tgEditUser(<%- JSON.stringify({
+                      _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "",
+                      role: u.role, status: u.status, team_id: u.team_id ? String(u.team_id._id) : ""
+                    }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                  <a class="btn btn-sm btn-outline-danger" href="/app?page=users&delete=1&table=users&id=<%= u._id %>"
+                     onclick="return confirm('Delete this user?')" aria-label="Delete user"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- User Modal -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalTitle" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form method="POST" action="/app?page=users">
+            <div class="modal-header">
+              <h2 class="modal-title h5" id="userModalTitle">Add User</h2>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" name="action" value="add_user" id="usAction">
+              <input type="hidden" name="user_id" id="usId">
+              <div class="mb-3"><label class="form-label" for="us_name">Full Name *</label><input class="form-control" id="us_name" name="full_name" required></div>
+              <div class="mb-3"><label class="form-label" for="us_email">Email *</label><input type="email" class="form-control" id="us_email" name="email" required></div>
+              <div class="mb-3"><label class="form-label" for="us_password">Password <span class="text-secondary" id="usPasswordHint">(min 6 chars)</span></label><input type="password" class="form-control" id="us_password" name="password" autocomplete="new-password"></div>
+              <div class="mb-3"><label class="form-label" for="us_phone">Phone</label><input class="form-control" id="us_phone" name="phone"></div>
+              <div class="mb-3">
+                <label class="form-label" for="us_role">Role *</label>
+                <select class="form-select" id="us_role" name="role" required onchange="tgToggleTeamField()">
+                  <% ['Super Admin','Admin','Team Leader','Sub Team Leader'].forEach(r => { %><option value="<%= r %>"><%= r %></option><% }) %>
+                </select>
+              </div>
+              <div class="mb-3" id="us_team_wrap">
+                <label class="form-label" for="us_team">Team</label>
+                <select class="form-select" id="us_team" name="team_id">
+                  <option value="">None</option>
+                  <% (data.teams || []).forEach(t => { %><option value="<%= t._id %>"><%= t.name %></option><% }) %>
+                </select>
+                <div class="text-secondary mt-1" style="font-size:12px;">Required for Team Leader / Sub Team Leader roles.</div>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="us_status">Status</label>
+                <select class="form-select" id="us_status" name="status">
+                  <option value="Active">Active</option><option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+

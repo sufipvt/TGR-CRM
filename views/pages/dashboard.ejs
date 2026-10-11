@@ -1,0 +1,110 @@
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi tg-kpi-blue">
+          <div class="tg-kpi-label">Total Leads</div>
+          <div class="tg-kpi-value"><%= data.total_leads %></div>
+          <i class="fa-solid fa-user-group tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi tg-kpi-teal">
+          <div class="tg-kpi-label">New Today</div>
+          <div class="tg-kpi-value"><%= data.new_today %></div>
+          <i class="fa-solid fa-bolt tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-xl">
+        <div class="tg-kpi <%= data.overdue_followups > 0 ? 'tg-kpi-red' : 'tg-kpi-indigo' %>">
+          <div class="tg-kpi-label">Pending Follow-Ups</div>
+          <div class="tg-kpi-value"><%= data.pending_followups %></div>
+          <% if (data.overdue_followups > 0) { %><div class="tg-kpi-sub"><%= data.overdue_followups %> overdue</div><% } %>
+          <i class="fa-solid fa-bell tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-6 col-md-6 col-xl">
+        <div class="tg-kpi tg-kpi-orange">
+          <div class="tg-kpi-label">Bookings</div>
+          <div class="tg-kpi-value"><%= data.total_bookings %></div>
+          <i class="fa-solid fa-file-signature tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+      <div class="col-12 col-md-6 col-xl">
+        <div class="tg-kpi tg-kpi-green">
+          <div class="tg-kpi-label">Total Revenue</div>
+          <div class="tg-kpi-value"><%= formatMoney(data.total_revenue) %></div>
+          <i class="fa-solid fa-indian-rupee-sign tg-kpi-icon" aria-hidden="true"></i>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-lg-7">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Booking Trend</h2>
+          <div style="position:relative;height:260px;">
+            <canvas id="trendChart"
+              data-labels='<%- JSON.stringify(data.booking_trend.map(b => b._id)) %>'
+              data-values='<%- JSON.stringify(data.booking_trend.map(b => b.revenue)) %>'></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Leads by Status</h2>
+          <div style="position:relative;height:260px;">
+            <canvas id="statusChart"
+              data-labels='<%- JSON.stringify(data.by_status.map(s => s._id)) %>'
+              data-values='<%- JSON.stringify(data.by_status.map(s => s.count)) %>'></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-lg-7">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Recent Leads</h2>
+          <div class="table-responsive">
+            <table class="table table-sm tg-table mb-0">
+              <thead><tr><th>Name</th><th>Source</th><th>Status</th><th>Created</th></tr></thead>
+              <tbody>
+                <% if (!data.recent_leads.length) { %>
+                  <tr><td colspan="4" class="text-secondary text-center py-4">No leads yet.</td></tr>
+                <% } %>
+                <% data.recent_leads.forEach(l => { %>
+                  <tr>
+                    <td class="fw-medium"><%= l.name %></td>
+                    <td><%= l.source_id ? l.source_id.name : '—' %></td>
+                    <td><span class="badge text-bg-<%= statusColors[l.status] || 'secondary' %>"><%= l.status %></span></td>
+                    <td class="text-secondary"><%= formatDate(l.created_at) %></td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="tg-panel">
+          <h2 class="tg-panel-title">Quick Actions</h2>
+          <div class="d-flex flex-column gap-2">
+            <a href="/app?page=leads" class="btn btn-outline-primary text-start"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Add Lead</a>
+            <a href="/app?page=followups" class="btn btn-outline-primary text-start"><i class="fa-solid fa-bell me-2" aria-hidden="true"></i>View Follow-Ups</a>
+            <a href="/app?page=bookings" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
+            <% if (isManager) { %>
+              <a href="/app?page=reports" class="btn btn-outline-primary text-start"><i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>View Reports</a>
+            <% } %>
+          </div>
+          <% if (isManager && data.closer_perf && data.closer_perf.length) { %>
+            <h2 class="tg-panel-title mt-4">Closer Performance</h2>
+            <% data.closer_perf.forEach(c => { %>
+              <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <span class="fw-medium"><%= c.closer[0] ? c.closer[0].full_name : 'Unknown' %></span>
+                <span class="text-secondary" style="font-size:13px;"><%= c.count %> bookings · <%= formatMoney(c.revenue) %></span>
+              </div>
+            <% }) %>
+          <% } %>
+        </div>
+      </div>
+    </div>
+
