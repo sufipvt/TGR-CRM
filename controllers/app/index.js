@@ -11,7 +11,7 @@ const {
   visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter
 } = require('../../services/access');
 const {
-  buildPerformanceReport, memberMatchFilter, resolveReportScope
+  reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope
 } = require('../../services/reports');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
@@ -130,10 +130,9 @@ async function appHandler(req, res) {
     } else if (page === 'settings') {
       data.settings = await getSettings();
     } else if (page === 'reports') {
-      const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const to = req.query.to ? new Date(req.query.to + 'T23:59:59') : new Date();
-      data.report_from = from.toISOString().slice(0, 10);
-      data.report_to = to.toISOString().slice(0, 10);
+      const { from, to, fromStr, toStr } = reportRange(req.query);
+      data.report_from = fromStr;
+      data.report_to = toStr;
 
       const scopeParam = req.query.scope || '';
       const scope = await resolveReportScope(user, scopeParam);

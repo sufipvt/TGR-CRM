@@ -4,6 +4,16 @@ const { User, Lead, FollowUp, Booking, Team } = require('../models');
 const { isAdminRole, isTeamLeader } = require('../utils/roles');
 const { getTeamMemberIds } = require('./access');
 
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
+// ?from=YYYY-MM-DD&to=YYYY-MM-DD as whole days in the business timezone. Default: the last 30 days.
+function reportRange(query) {
+  const from = DAY_RE.test(query.from || '') ? new Date(query.from + 'T00:00:00') : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const to = DAY_RE.test(query.to || '') ? new Date(query.to + 'T23:59:59.999') : new Date();
+  return { from, to, fromStr: ymd(from), toStr: ymd(to) };
+}
+
 // Replaces an N-users x 4-queries loop with 3 fixed queries total, regardless of team size.
 async function buildPerformanceReport(perfUsers, bookingRangeFilter) {
   const userIds = perfUsers.map(u => u._id);
@@ -82,4 +92,4 @@ async function resolveReportScope(user, scopeParam) {
   return { label: user.name, memberIds: [new Types.ObjectId(user.userId)] };
 }
 
-module.exports = { buildPerformanceReport, memberMatchFilter, resolveReportScope };
+module.exports = { reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope };
