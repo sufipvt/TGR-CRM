@@ -54,6 +54,8 @@ app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
 app.locals.formatDateTime = formatDateTime;
+// Changes on every deploy so browsers fetch the new app.js/app.css instead of a cached copy.
+app.locals.assetVersion = (process.env.RENDER_GIT_COMMIT || String(Date.now())).slice(0, 12);
 
 // ---------------------------------------------------------------------------
 // ROUTES: public, API, receipt, CSV import (see routes/)

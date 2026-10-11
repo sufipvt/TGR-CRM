@@ -35,7 +35,7 @@
 
             <div class="d-flex gap-2 mt-3">
               <button class="btn btn-sm btn-outline-primary" aria-label="Edit team"
-                onclick='tgEditTeam(<%- JSON.stringify({
+                onclick='tgEditTeam(<%= JSON.stringify({
                   _id: String(t._id), name: t.name,
                   team_leader_id: t.team_leader_id ? String(t.team_leader_id._id) : ""
                 }) %>)'><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit</button>

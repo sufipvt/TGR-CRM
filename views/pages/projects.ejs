@@ -30,7 +30,7 @@
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#units-<%= p._id %>">Manage Units (<%= pUnits.length %>)</button>
               <button class="btn btn-sm btn-outline-primary" aria-label="Edit project"
-                onclick='tgEditProject(<%- JSON.stringify({
+                onclick='tgEditProject(<%= JSON.stringify({
                   _id: String(p._id), name: p.name, developer: p.developer || "", location: p.location || "",
                   city: p.city || "", state: p.state || "", project_type: p.project_type || "Other",
                   status: p.status, total_units: p.total_units, available_units: p.available_units,
@@ -54,7 +54,7 @@
                         <td><span class="badge text-bg-<%= u.status === 'Available' ? 'success' : (u.status === 'Sold' || u.status === 'Booked' ? 'danger' : 'warning') %>" style="font-size:10px;"><%= u.status %></span></td>
                         <td class="text-nowrap">
                           <button class="btn btn-sm btn-outline-primary py-0 px-1" aria-label="Edit unit"
-                            onclick='tgEditUnit(<%- JSON.stringify({
+                            onclick='tgEditUnit(<%= JSON.stringify({
                               _id: String(u._id), project_id: String(u.project_id), unit_number: u.unit_number,
                               type: u.type || "", bhk: u.bhk || "", area_sqft: u.area_sqft || 0,
                               base_price: u.base_price || 0, status: u.status, notes: u.notes || ""
