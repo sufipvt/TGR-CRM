@@ -49,6 +49,7 @@ app.use(helmet({
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+app.use(require('./middleware/sanitize').sanitizeInput);
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
 
 app.locals.formatMoney = formatMoney;
@@ -89,19 +90,26 @@ app.use((err, req, res, next) => {
 // ---------------------------------------------------------------------------
 // SEED + START
 // ---------------------------------------------------------------------------
+// First boot only: create the Super Admin when the database has no users at all.
+// Credentials come from SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD and are never logged,
+// so a restart can never recreate a known-password account on a live database.
 async function initAdmin() {
+  if (await User.estimatedDocumentCount() > 0) return;
+  const email = (process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase();
+  const password = process.env.SEED_ADMIN_PASSWORD || '';
+  if (!email || password.length < 12) {
+    console.warn('WARN: no users exist yet. Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD (12+ chars) and restart to create the first Super Admin.');
+    return;
+  }
   try {
-    const exists = await User.findOne({ $or: [{ role: 'Admin' }, { email: 'admin@truegrowth.com' }] });
-    if (exists) return;
-    const hashed = await bcrypt.hash('Admin@123', 12);
     await User.create({
       full_name: 'Administrator',
-      email: 'admin@truegrowth.com',
-      password: hashed,
-      role: 'Admin',
+      email,
+      password: await bcrypt.hash(password, 12),
+      role: 'Super Admin',
       status: 'Active'
     });
-    console.log('Admin user seeded: admin@truegrowth.com / Admin@123');
+    console.log('First Super Admin created: ' + email + ' (remove SEED_ADMIN_PASSWORD from the environment now)');
   } catch (e) {
     if (e.code === 11000) return; // already seeded by a concurrent restart
     throw e;
