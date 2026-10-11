@@ -40,129 +40,15 @@ process.on('unhandledRejection', (reason) => {
 // ---------------------------------------------------------------------------
 // MODELS
 // ---------------------------------------------------------------------------
-const { Schema, Types } = mongoose;
+const { Types } = mongoose;
 const {
-  USER_ROLES, LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, BAD_CONTACT_OUTCOMES,
-  NOT_INTERESTED_REASONS, LOST_REASONS, DISPOSITION_REASONS
+  LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, BAD_CONTACT_OUTCOMES,
+  NOT_INTERESTED_REASONS, LOST_REASONS
 } = require('./config/constants');
-
-const User = mongoose.model('User', new Schema({
-  full_name: { type: String, required: true },
-  email:     { type: String, required: true, unique: true, lowercase: true },
-  password:  { type: String, required: true },
-  role:      { type: String, enum: USER_ROLES, required: true },
-  team_id:   { type: Schema.Types.ObjectId, ref: 'Team', index: true },
-  phone:     String,
-  status:    { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
-  created_at:{ type: Date, default: Date.now }
-}));
-
-const Project = mongoose.model('Project', new Schema({
-  name:            { type: String, required: true },
-  developer:       String,
-  location:        String,
-  city:            String,
-  state:           String,
-  project_type:    { type: String, enum: ['Apartment', 'Villa', 'Plot', 'Commercial', 'Penthouse', 'Studio', 'Other'] },
-  status:          { type: String, enum: ['Upcoming', 'Under Construction', 'Ready to Move', 'Sold Out'], default: 'Upcoming' },
-  total_units:     { type: Number, default: 0 },
-  available_units: { type: Number, default: 0 },
-  price_range:     String,
-  notes:           String,
-  created_at:      { type: Date, default: Date.now }
-}));
-
-const Unit = mongoose.model('Unit', new Schema({
-  project_id:  { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-  unit_number: { type: String, required: true },
-  type:        String,
-  bhk:         String,
-  area_sqft:   Number,
-  base_price:  Number,
-  status:      { type: String, enum: ['Available', 'Blocked', 'Booked', 'Sold'], default: 'Available' },
-  notes:       String
-}));
-
-const LeadSource = mongoose.model('LeadSource', new Schema({
-  name:    { type: String, required: true },
-  channel: { type: String, enum: ['Online', 'Offline', 'Referral', 'Direct'] },
-  active:  { type: Boolean, default: true },
-  notes:   String
-}));
-
-const Lead = mongoose.model('Lead', new Schema({
-  name:               { type: String, required: true },
-  phone:              { type: String, required: true },
-  email:              String,
-  city:               String,
-  project_id:         { type: Schema.Types.ObjectId, ref: 'Project' },
-  budget_range:       String,
-  source_id:          { type: Schema.Types.ObjectId, ref: 'LeadSource', required: true },
-  status:             { type: String, enum: LEAD_STATUSES, default: 'New' },
-  temperature:        { type: String, enum: LEAD_TEMPERATURES },
-  contact_outcome:    { type: String, enum: CONTACT_OUTCOMES },
-  disposition_reason: { type: String, enum: DISPOSITION_REASONS },
-  assigned_caller_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
-  assigned_closer_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
-  notes:              String,
-  created_at:         { type: Date, default: Date.now },
-  qualified_at:       Date,
-  booked_at:          Date
-}));
-
-const FollowUp = mongoose.model('FollowUp', new Schema({
-  lead_id:        { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
-  assigned_to_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  scheduled_date: { type: Date, required: true },
-  completed_date: Date,
-  type:           { type: String, enum: ['Call', 'WhatsApp', 'Site Visit', 'Meeting', 'Email', 'Other'], default: 'Call' },
-  status:         { type: String, enum: ['Pending', 'Completed', 'Missed', 'Cancelled'], default: 'Pending' },
-  outcome:        String,
-  notes:          String,
-  created_at:     { type: Date, default: Date.now }
-}));
-
-const Booking = mongoose.model('Booking', new Schema({
-  lead_id:        { type: Schema.Types.ObjectId, ref: 'Lead', required: true },
-  project_id:     { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-  unit_id:        { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
-  closer_id:      { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  booking_date:   { type: Date, default: Date.now },
-  sale_value:     { type: Number, default: 0 },
-  booking_amount: { type: Number, required: true },
-  status:         { type: String, enum: ['Tentative', 'Confirmed', 'Cancelled'], default: 'Tentative' },
-  notes:          String,
-  created_at:     { type: Date, default: Date.now }
-}));
-
-const Payment = mongoose.model('Payment', new Schema({
-  booking_id:   { type: Schema.Types.ObjectId, ref: 'Booking', required: true },
-  amount:       { type: Number, required: true },
-  payment_date: { type: Date, default: Date.now },
-  method:       { type: String, enum: ['Cash', 'Cheque', 'Bank Transfer', 'UPI', 'Card', 'Other'] },
-  reference:    String,
-  notes:        String
-}));
-
-const Team = mongoose.model('Team', new Schema({
-  name:            { type: String, required: true, unique: true },
-  team_leader_id:  { type: Schema.Types.ObjectId, ref: 'User' },
-  created_at:      { type: Date, default: Date.now }
-}));
-
-const AuditLog = mongoose.model('AuditLog', new Schema({
-  user_email: String,
-  action:     String,
-  entity:     String,
-  entity_id:  String,
-  details:    Schema.Types.Mixed,
-  created_at: { type: Date, default: Date.now, expires: 15552000 } // 180 days TTL
-}));
-
-const Setting = mongoose.model('Setting', new Schema({
-  key:   { type: String, required: true, unique: true },
-  value: Schema.Types.Mixed
-}));
+const {
+  User, Project, Unit, LeadSource, Lead, FollowUp,
+  Booking, Payment, Team, AuditLog, Setting
+} = require('./models');
 
 // ---------------------------------------------------------------------------
 // HELPERS
