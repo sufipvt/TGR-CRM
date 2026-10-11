@@ -13,6 +13,7 @@ const {
 const {
   reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope
 } = require('../../services/reports');
+const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -129,6 +130,7 @@ async function appHandler(req, res) {
       data.all_agents = allUsers.filter(u => ['Team Leader', 'Sub Team Leader'].includes(u.role));
     } else if (page === 'settings') {
       data.settings = await getSettings();
+      data.unfixed_followups = isSuperAdmin(user.role) ? await countUnfixedFollowUps() : 0;
     } else if (page === 'reports') {
       const { from, to, fromStr, toStr } = reportRange(req.query);
       data.report_from = fromStr;

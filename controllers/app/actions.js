@@ -13,6 +13,7 @@ const { isSuperAdmin, isAdminRole, isTeamLeader, isManager } = require('../../ut
 const { audit } = require('../../services/audit');
 const { clearSettingsCache } = require('../../services/settings');
 const { getNextCaller } = require('../../services/assignment');
+const { fixFollowUpTimes } = require('../../services/istFollowupFix');
 const { canEditLead, canActForUser, canAssignTo } = require('../../services/access');
 const { userContextCache } = require('../../middleware/auth');
 
@@ -356,6 +357,15 @@ async function handlePostAction(req) {
       await User.findByIdAndUpdate(body.user_id, { team_id: objIdOrNull(body.team_id) });
       await audit(user.email, 'update', 'User', body.user_id, { team_assigned: body.team_id });
       return 'Team member assigned.';
+    }
+
+    case 'fix_followup_times': {
+      if (!isSuperAdmin(user.role)) throw forbidden();
+      const shifted = await fixFollowUpTimes();
+      await audit(user.email, 'update', 'FollowUp', '', { ist_time_fix: shifted });
+      return shifted
+        ? `Fixed ${shifted} follow-up time${shifted === 1 ? '' : 's'}. They now show India time.`
+        : 'Nothing to fix. All follow-up times are already correct.';
     }
 
     case 'save_settings': {
