@@ -254,10 +254,11 @@ async function tgShowTimeline(leadId, leadName) {
   }
 }
 
+// Safe for both element text and quoted attribute values.
 function escapeHtml(s) {
-  const div = document.createElement('div');
-  div.textContent = String(s == null ? '' : s);
-  return div.innerHTML;
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* ============================ CSV IMPORT ============================ */
@@ -679,7 +680,7 @@ async function tgShowColumnMapper() {
 
     const skipOpt = '<option value="">(Skip this field)</option>';
     const colOpts = headers.map(h =>
-      `<option value="${h.replace(/"/g,'&quot;')}">${h}</option>`
+      `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`
     ).join('');
 
     for (const [field, meta] of Object.entries(TG_FIELD_LABELS)) {
@@ -702,8 +703,8 @@ async function tgShowColumnMapper() {
         </td>
         <td style="font-size:12px; color:#6b7280; max-width:160px;
                    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"
-            id="preview_${field}" title="${preview}">
-          ${preview || '<span class="text-muted">—</span>'}
+            id="preview_${field}" title="${escapeHtml(preview)}">
+          ${preview ? escapeHtml(preview) : '<span class="text-muted">—</span>'}
         </td>
       `;
       tbody.appendChild(tr);
@@ -884,7 +885,9 @@ function tgAppendMsg(text, type, persist) {
   const box = document.getElementById('tgChatMessages');
   const div = document.createElement('div');
   div.className = type === 'user' ? 'tg-msg-user' : 'tg-msg-bot';
-  div.innerHTML = text
+  // Escape first so lead names / AI output render as text, then apply the
+  // two bits of formatting the bot uses (**bold** and line breaks).
+  div.innerHTML = escapeHtml(text)
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\n/g, '<br>');
   box.appendChild(div);

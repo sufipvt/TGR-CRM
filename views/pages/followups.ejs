@@ -36,7 +36,7 @@
                         <button class="btn btn-sm btn-outline-success" title="Mark done" onclick="tgCompleteFollowup('<%= f._id %>')">Done</button>
                       <% } %>
                       <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit follow-up"
-                        onclick='tgEditFollowup(<%- JSON.stringify({
+                        onclick='tgEditFollowup(<%= JSON.stringify({
                           _id: String(f._id), lead_id: f.lead_id ? String(f.lead_id._id) : "",
                           assigned_to_id: f.assigned_to_id ? String(f.assigned_to_id._id) : "",
                           scheduled_date: f.scheduled_date ? new Date(f.scheduled_date).toISOString().slice(0,16) : "",

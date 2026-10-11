@@ -81,12 +81,12 @@
                   <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
                      href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
                      title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
-                  <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
                   <% if (canEdit) { %>
                     <button type="button" class="btn btn-sm btn-outline-danger" title="Not Interested"
-                      onclick='tgShowNiModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'>NI</button>
+                      onclick='tgShowNiModal("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)'>NI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Could not connect" aria-label="Log contact attempt"
-                      onclick='tgShowContactOutcomeModal("<%= lead._id %>", <%- JSON.stringify(lead.name) %>)'><i class="fa-solid fa-phone-slash" aria-hidden="true"></i></button>
+                      onclick='tgShowContactOutcomeModal("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)'><i class="fa-solid fa-phone-slash" aria-hidden="true"></i></button>
                     <form method="POST" action="/app?page=leads" style="display:inline">
                       <input type="hidden" name="action" value="quick_disposition">
                       <input type="hidden" name="lead_id" value="<%= lead._id %>">
@@ -100,7 +100,7 @@
                       <button type="submit" class="btn btn-sm btn-outline-success" title="Interested / Qualified">INT</button>
                     </form>
                     <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead"
-                    onclick='tgEditLead(<%- JSON.stringify({
+                    onclick='tgEditLead(<%= JSON.stringify({
                       _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
                       source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
                       budget_range: lead.budget_range || "", status: lead.status,
@@ -193,7 +193,7 @@
                     <% if (canEditCard) { %>
                       <div class="tg-kanban-card-actions">
                         <button class="btn btn-sm py-0 px-1 btn-outline-primary" title="Edit" aria-label="Edit lead"
-                          onclick='tgEditLead(<%- JSON.stringify({
+                          onclick='tgEditLead(<%= JSON.stringify({
                             _id: String(lead._id), name: lead.name, phone: lead.phone,
                             email: lead.email || "", city: lead.city || "",
                             source_id: lead.source_id ? String(lead.source_id._id) : "",

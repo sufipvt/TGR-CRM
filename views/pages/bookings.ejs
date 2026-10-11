@@ -45,7 +45,7 @@
                   <a class="btn btn-sm btn-outline-secondary" href="/app/receipt/<%= b._id %>" target="_blank" rel="noopener" title="Receipt" aria-label="View receipt"><i class="fa-solid fa-receipt" aria-hidden="true"></i></a>
                   <button class="btn btn-sm btn-outline-success" title="Add payment" onclick="tgPayBooking('<%= b._id %>', '<%= b.lead_id ? b.lead_id.name.replace(/'/g,'') : '' %>')">Pay</button>
                   <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit booking"
-                    onclick='tgEditBooking(<%- JSON.stringify({
+                    onclick='tgEditBooking(<%= JSON.stringify({
                       _id: String(b._id), sale_value: b.sale_value, booking_amount: b.booking_amount,
                       booking_date: b.booking_date ? new Date(b.booking_date).toISOString().slice(0,10) : "",
                       status: b.status, notes: b.notes || ""
