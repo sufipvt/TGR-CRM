@@ -39,7 +39,7 @@
                         onclick='tgEditFollowup(<%= JSON.stringify({
                           _id: String(f._id), lead_id: f.lead_id ? String(f.lead_id._id) : "",
                           assigned_to_id: f.assigned_to_id ? String(f.assigned_to_id._id) : "",
-                          scheduled_date: f.scheduled_date ? new Date(f.scheduled_date).toISOString().slice(0,16) : "",
+                          scheduled_date: toDateTimeInput(f.scheduled_date),
                           type: f.type, status: f.status, outcome: f.outcome || "", notes: f.notes || ""
                         }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                       <a class="btn btn-sm btn-outline-danger" href="/app?page=followups&delete=1&table=followups&id=<%= f._id %>"

@@ -31,7 +31,7 @@ process.on('unhandledRejection', (reason) => {
 // MODELS + HELPERS USED HERE
 // ---------------------------------------------------------------------------
 const { User } = require('./models');
-const { formatMoney, formatDate, formatDateTime } = require('./utils/format');
+const { formatMoney, formatDate, formatDateTime, toDateTimeInput } = require('./utils/format');
 const { sendErrorPage } = require('./utils/errorPage');
 const { sendDailyDigest } = require('./services/digest');
 
@@ -56,6 +56,7 @@ app.use(require('./middleware/brand').brandLocals);
 app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
 app.locals.formatDateTime = formatDateTime;
+app.locals.toDateTimeInput = toDateTimeInput;
 // Changes on every deploy so browsers fetch the new app.js/app.css instead of a cached copy.
 app.locals.assetVersion = (process.env.RENDER_GIT_COMMIT || String(Date.now())).slice(0, 12);
 
@@ -122,7 +123,7 @@ module.exports = app;
 // Only connect, schedule and listen when run directly (`node server.js`).
 // When required (e.g. by tests), the app is exported without side effects.
 if (require.main === module) {
-  cron.schedule('30 2 * * *', sendDailyDigest, { timezone: 'Asia/Kolkata' }); // 02:30 UTC = 08:00 IST
+  cron.schedule('0 8 * * *', sendDailyDigest, { timezone: process.env.TZ }); // 08:00 business time
 
   mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {

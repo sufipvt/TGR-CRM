@@ -1,6 +1,6 @@
-// ONE-TIME migration — run with: node migrate-roles.js
+// ONE-TIME migration (kept for history): node migrations/2026-07-migrate-roles.js
 // Maps old 4 roles → new hierarchy, creates a Default Team for existing agents
-require('dotenv').config({ path: '.env.development.local' });
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.development.local') });
 const mongoose = require('mongoose');
 
 const ROLE_MAP = {

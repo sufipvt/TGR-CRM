@@ -58,7 +58,8 @@ The chatbot (`routes/chat.js`) must use the same filters, including for anything
 - Write an `audit(...)` entry for every create, update and delete.
 - Form actions throw `Object.assign(new Error(msg), { status })`, and `controllers/app/index.js` turns that into a flash message.
 - Keep files under ~600 lines; split by responsibility when they grow (`public/app.js` is already over).
-- Dates: the business runs on IST (Asia/Kolkata).
+- Dates: `config/env.js` sets `process.env.TZ` to `APP_TIMEZONE` (default Asia/Kolkata), so `new Date()`, `setHours` and `toLocale*` are business time. For datetime-local inputs use `toDateTimeInput()`, never `toISOString()` (that's UTC).
+- One-off data changes go in `migrations/` as dated scripts with a dry-run default and `--apply`.
 
 ## Commands
 - `npm run dev`: local server with reload (needs `.env.development.local`, see `.env.example`)

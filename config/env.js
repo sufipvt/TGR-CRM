@@ -1,3 +1,7 @@
+// Business timezone. Set before anything creates a Date: "today", overdue checks,
+// typed-in follow-up times and every displayed date use it. Render runs on UTC.
+process.env.TZ = process.env.APP_TIMEZONE || 'Asia/Kolkata';
+
 // Environment loading + validation. Required first by server.js so the
 // process exits early (same messages as before) if config is missing.
 if (process.env.NODE_ENV !== 'production') {
