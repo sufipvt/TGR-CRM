@@ -8,9 +8,9 @@ module.exports = mongoose.model('Lead', new Schema({
   phone:              { type: String, required: true },
   email:              String,
   city:               String,
-  project_id:         { type: Schema.Types.ObjectId, ref: 'Project' },
+  project_id:         { type: Schema.Types.ObjectId, ref: 'Project', index: true },
   budget_range:       String,
-  source_id:          { type: Schema.Types.ObjectId, ref: 'LeadSource', required: true },
+  source_id:          { type: Schema.Types.ObjectId, ref: 'LeadSource', required: true, index: true },
   status:             { type: String, enum: LEAD_STATUSES, default: 'New' },
   temperature:        { type: String, enum: LEAD_TEMPERATURES },
   contact_outcome:    { type: String, enum: CONTACT_OUTCOMES },
@@ -18,7 +18,7 @@ module.exports = mongoose.model('Lead', new Schema({
   assigned_caller_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   assigned_closer_id: { type: Schema.Types.ObjectId, ref: 'User', index: true },
   notes:              String,
-  created_at:         { type: Date, default: Date.now },
+  created_at:         { type: Date, default: Date.now, index: true },
   qualified_at:       Date,
   booked_at:          Date
 }));

@@ -252,13 +252,28 @@ async function handlePostAction(req) {
       }
       if (!(await canEditLead(user, leadId))) throw forbidden('You can only book your own team\'s leads');
       await assertAssignable(user, closerId);
-      const b = await Booking.create({
-        lead_id: leadId, project_id: objIdOrNull(body.project_id), unit_id: objIdOrNull(body.unit_id),
-        closer_id: closerId, booking_date: body.booking_date ? new Date(body.booking_date) : new Date(),
-        sale_value: Number(body.sale_value || 0), booking_amount: Number(body.booking_amount || 0),
-        status: body.status || 'Tentative', notes: body.notes
-      });
-      await Unit.findByIdAndUpdate(body.unit_id, { status: 'Booked' });
+
+      // Claim the unit in one atomic step (guide blocks 17 + 35): only one of two
+      // simultaneous bookings can flip it from Available, the other gets a clear error.
+      const unitId = objIdOrNull(body.unit_id);
+      if (!unitId) throw Object.assign(new Error('Select a unit'), { status: 400 });
+      const unit = await Unit.findOneAndUpdate({ _id: unitId, status: 'Available' }, { status: 'Booked' }, { new: true });
+      if (!unit) throw Object.assign(new Error('That unit is no longer available. Pick another unit.'), { status: 409 });
+
+      let b;
+      try {
+        b = await Booking.create({
+          lead_id: leadId, project_id: unit.project_id, unit_id: unit._id,
+          closer_id: closerId, booking_date: body.booking_date ? new Date(body.booking_date) : new Date(),
+          sale_value: Number(body.sale_value || 0), booking_amount: Number(body.booking_amount || 0),
+          status: body.status || 'Tentative', notes: body.notes
+        });
+      } catch (e) {
+        // Give the unit back so a failed booking never leaves it stuck as Booked
+        await Unit.updateOne({ _id: unit._id, status: 'Booked' }, { status: 'Available' });
+        if (e.name === 'ValidationError') throw Object.assign(new Error('Check the booking amounts and date'), { status: 400 });
+        throw e;
+      }
       await Lead.findByIdAndUpdate(leadId, { status: 'Booked', booked_at: new Date() });
       await audit(user.email, 'create', 'Booking', b._id, { lead: lead.name, sale_value: body.sale_value });
       return 'Booking created.';

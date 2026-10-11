@@ -7,6 +7,7 @@ const { User } = require('../models');
 const { clean } = require('../utils/request');
 const { audit } = require('../services/audit');
 const { loginLimiter } = require('../middleware/rateLimits');
+const lockout = require('../middleware/loginLockout');
 
 const router = express.Router();
 
@@ -19,11 +20,16 @@ router.get('/login', (req, res) => {
 router.post('/login', loginLimiter, async (req, res) => {
   try {
     const email = clean(req.body.email || '').toLowerCase();
-    const password = req.body.password || '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (lockout.isLocked(email)) {
+      return res.redirect('/login?error=' + encodeURIComponent('Too many failed attempts. Try again in 15 minutes.'));
+    }
     const user = await User.findOne({ email, status: 'Active' });
     if (!user || !(await bcrypt.compare(password, user.password))) {
+      lockout.recordFailure(email);
       return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password'));
     }
+    lockout.recordSuccess(email);
     const token = jwt.sign(
       { userId: user._id, role: user.role, email: user.email, name: user.full_name, team_id: user.team_id || null },
       process.env.JWT_SECRET,

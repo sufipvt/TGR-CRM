@@ -5,6 +5,14 @@ const { APP_NAME } = require('./settings');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  sgMail.setTimeout(15000); // one slow send must not stall the whole digest run
+}
+
+// Lead names, phones and notes are user data: escape them before they go into email HTML.
+function esc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function digestKpiBox(label, count, color) {
@@ -17,11 +25,11 @@ function followupCard(f) {
   const lead = f.lead_id || {};
   const when = new Date(f.scheduled_date).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   return '<div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;margin-bottom:10px;">' +
-    '<div style="font-weight:600;color:#111827;">' + (lead.name || 'Lead') + ' <span style="color:#6b7280;font-weight:400;">' + (lead.phone || '') + '</span></div>' +
+    '<div style="font-weight:600;color:#111827;">' + esc(lead.name || 'Lead') + ' <span style="color:#6b7280;font-weight:400;">' + esc(lead.phone || '') + '</span></div>' +
     '<div style="font-size:13px;color:#374151;margin-top:4px;">' +
     '<span style="background:#1a56db;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;">' + f.type + '</span> ' +
     '<span style="color:#6b7280;">' + when + '</span></div>' +
-    (f.notes ? '<div style="font-size:12px;color:#6b7280;margin-top:4px;">' + f.notes + '</div>' : '') +
+    (f.notes ? '<div style="font-size:12px;color:#6b7280;margin-top:4px;">' + esc(f.notes) + '</div>' : '') +
     '</div>';
 }
 
@@ -88,7 +96,7 @@ async function sendDailyDigest() {
         digestKpiBox('New Leads Today', newToday, '#1a56db') +
         digestKpiBox('Active Agents', teamStats.length, '#059669');
       const rows = teamStats.map(t =>
-        '<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">' + t.name + ' <span style="color:#6b7280;">(' + t.role + ')</span></td>' +
+        '<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">' + esc(t.name) + ' <span style="color:#6b7280;">(' + esc(t.role) + ')</span></td>' +
         '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;color:' + (t.overdue > 0 ? '#dc2626' : '#111827') + ';">' + t.overdue + '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">' + t.today + '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">' + t.upcoming + '</td></tr>'

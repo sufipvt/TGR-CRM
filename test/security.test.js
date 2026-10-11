@@ -74,3 +74,19 @@ test('chat only searches leads the user can see', async () => {
   const regex = await (await as(f.subA).postJson('/api/chat', { message: '/search (.*' })).json();
   assert.match(regex.reply, /No leads found/);
 });
+
+test('two bookings for the same unit: the second is refused', async () => {
+  const booking = { action: 'add_booking', lead_id: String(f.leadA._id), unit_id: String(f.unitA._id), closer_id: String(f.subA._id), sale_value: '4000000', booking_amount: '100000' };
+  const [one, two] = await Promise.all([as(f.superAdmin).post('/app?page=bookings', booking), as(f.admin).post('/app?page=bookings', booking)]);
+  const msgs = [one.msg, two.msg].sort();
+  assert.deepEqual(msgs, ['Booking created.', 'Error: That unit is no longer available. Pick another unit.']);
+  assert.equal(await models.Booking.countDocuments({ unit_id: f.unitA._id }), 1);
+});
+
+test('a failed booking hands the unit back', async () => {
+  const unit = await models.Unit.create({ project_id: f.project._id, unit_number: 'C-301' });
+  // booking_amount is required by the schema; NaN makes Booking.create fail after the unit is claimed
+  const r = await as(f.superAdmin).post('/app?page=bookings', { action: 'add_booking', lead_id: String(f.leadA._id), unit_id: String(unit._id), booking_amount: 'abc' });
+  assert.equal(r.msg, 'Error: Check the booking amounts and date');
+  assert.equal((await models.Unit.findById(unit._id)).status, 'Available');
+});
