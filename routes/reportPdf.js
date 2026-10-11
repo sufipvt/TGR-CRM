@@ -11,7 +11,7 @@ const {
   PDF_COLORS, STATUS_COLORS_PDF, pdfHeader, pdfSectionHeader, pdfKpiCards, pdfTable, pdfFooter
 } = require('../services/pdf');
 const {
-  buildPerformanceReport, memberMatchFilter, resolveReportScope
+  reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope
 } = require('../services/reports');
 
 const router = express.Router();
@@ -19,8 +19,7 @@ const router = express.Router();
 router.get('/app/report-pdf', requireAuth, expensiveOpLimiter, refreshUserContext, async (req, res) => {
   try {
     const user = req.user;
-    const from = req.query.from ? new Date(req.query.from) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const to = req.query.to ? new Date(req.query.to + 'T23:59:59') : new Date();
+    const { from, to } = reportRange(req.query);
     const scopeParam = req.query.scope || '';
     const scope = await resolveReportScope(user, scopeParam);
     const memberFilter = memberMatchFilter(scope.memberIds);
