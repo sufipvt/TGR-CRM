@@ -87,4 +87,4 @@ function as(user) {
   };
 }
 
-module.exports = { start, stop, as, models };
+module.exports = { start, stop, as, models, baseUrl: () => baseUrl };
