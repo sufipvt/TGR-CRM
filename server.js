@@ -2021,8 +2021,6 @@ async function sendDailyDigest() {
   }
 }
 
-cron.schedule('30 2 * * *', sendDailyDigest, { timezone: 'Asia/Kolkata' }); // 02:30 UTC = 08:00 IST
-
 // ---------------------------------------------------------------------------
 // SEED + START
 // ---------------------------------------------------------------------------
@@ -2045,13 +2043,21 @@ async function initAdmin() {
   }
 }
 
-mongoose.connect(process.env.MONGODB_URI)
-  .then(async () => {
-    console.log('MongoDB connected');
-    await initAdmin();
-    app.listen(PORT, () => console.log('TrueGrowth CRM running on port ' + PORT));
-  })
-  .catch(err => {
-    console.error('MongoDB connection failed:', err.message);
-    process.exit(1);
-  });
+module.exports = app;
+
+// Only connect, schedule and listen when run directly (`node server.js`).
+// When required (e.g. by tests), the app is exported without side effects.
+if (require.main === module) {
+  cron.schedule('30 2 * * *', sendDailyDigest, { timezone: 'Asia/Kolkata' }); // 02:30 UTC = 08:00 IST
+
+  mongoose.connect(process.env.MONGODB_URI)
+    .then(async () => {
+      console.log('MongoDB connected');
+      await initAdmin();
+      app.listen(PORT, () => console.log('TrueGrowth CRM running on port ' + PORT));
+    })
+    .catch(err => {
+      console.error('MongoDB connection failed:', err.message);
+      process.exit(1);
+    });
+}
