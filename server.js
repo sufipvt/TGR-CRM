@@ -49,44 +49,14 @@ const {
   User, Project, Unit, LeadSource, Lead, FollowUp,
   Booking, Payment, Team, AuditLog, Setting
 } = require('./models');
+const { formatMoney, formatDate, formatDateTime, formatMoneyPdf } = require('./utils/format');
+const { sendErrorPage } = require('./utils/errorPage');
+const { clean, cleanBody, objIdOrNull, escapeRegex } = require('./utils/request');
+const { isSuperAdmin, isAdminRole, isTeamLeader, isManager, isAdminOrMD } = require('./utils/roles');
 
 // ---------------------------------------------------------------------------
 // HELPERS
 // ---------------------------------------------------------------------------
-function formatMoney(n) {
-  return '\u20B9' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-}
-function formatDate(d) {
-  if (!d) return '\u2014';
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-function formatDateTime(d) {
-  if (!d) return '\u2014';
-  return new Date(d).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-function sendErrorPage(res, status, message) {
-  res.status(status).send(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>TrueGrowth CRM</title>
-<style>
-  body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f8fafc; color:#111827; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
-  .box { text-align:center; padding:40px; max-width:420px; }
-  .icon { font-size:48px; margin-bottom:16px; }
-  h1 { font-size:20px; margin:0 0 8px; }
-  p { color:#6b7280; font-size:14px; margin:0 0 24px; }
-  a { display:inline-block; background:#1a56db; color:#fff; text-decoration:none; padding:10px 22px; border-radius:8px; font-size:14px; font-weight:600; }
-</style></head>
-<body><div class="box">
-  <div class="icon">\u26A0\uFE0F</div>
-  <h1>Something went wrong</h1>
-  <p>${message}</p>
-  <a href="/app">Return to Dashboard</a>
-</div></body></html>`);
-}
-
-function formatMoneyPdf(n) {
-  return 'Rs. ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
-}
-
 const PDF_COLORS = {
   brand: '#1a56db', dark: '#111827', gray: '#6b7280',
   lightGray: '#f1f5f9', border: '#e5e7eb', green: '#059669', red: '#dc2626'
@@ -190,15 +160,6 @@ function pdfFooter(doc, pageNum, totalPages, companyName) {
     .text(companyName + ' \u2014 Confidential', 40, bottom, { width: 300 })
     .text('Page ' + pageNum + ' of ' + totalPages, doc.page.width - 140, bottom, { width: 100, align: 'right' });
 }
-function clean(v) { return typeof v === 'string' ? v.trim() : v; }
-function cleanBody(body) {
-  const out = {};
-  for (const k of Object.keys(body)) out[k] = clean(body[k]);
-  return out;
-}
-function objIdOrNull(v) {
-  return v && Types.ObjectId.isValid(v) ? new Types.ObjectId(v) : null;
-}
 
 async function audit(userEmail, action, entity, entityId, details) {
   try {
@@ -228,12 +189,6 @@ async function getNextCaller() {
   counts.forEach(c => { countMap[String(c._id)] = c.count; });
   return callers.sort((a, b) => countMap[String(a._id)] - countMap[String(b._id)])[0]._id;
 }
-
-function isSuperAdmin(role) { return role === 'Super Admin'; }
-function isAdminRole(role)  { return ['Super Admin', 'Admin'].includes(role); }
-function isTeamLeader(role) { return role === 'Team Leader'; }
-
-function isTeamLeader(role) { return role === 'Team Leader'; }
 
 // Replaces an N-users x 4-queries loop with 3 fixed queries total, regardless of team size.
 async function buildPerformanceReport(perfUsers, bookingRangeFilter) {
@@ -312,7 +267,6 @@ async function resolveReportScope(user, scopeParam) {
   }
   return { label: user.name, memberIds: [new Types.ObjectId(user.userId)] };
 }
-function isManager(role)    { return ['Super Admin', 'Admin', 'Team Leader'].includes(role); } // kept for backward compat across the file
 
 // Get all Sub-TL user IDs under a Team Leader's team
 async function getTeamMemberIds(user) {
@@ -657,8 +611,6 @@ app.get('/app/receipt/:bookingId', requireAuth, appActionLimiter, refreshUserCon
 // ---------------------------------------------------------------------------
 // CSV IMPORT
 // ---------------------------------------------------------------------------
-function escapeRegex(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
-
 app.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserContext, requireAdmin, (req, res) => {
   upload.single('csv_file')(req, res, async (err) => {
     if (err) return res.redirect('/app?page=leads&msg=' + encodeURIComponent('Upload failed: ' + err.message));
@@ -1742,10 +1694,6 @@ app.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (req, 
     res.json({ reply: 'Something went wrong. Try again.' });
   }
 });
-
-function isAdminOrMD(user) {
-  return ['Super Admin', 'Admin', 'Team Leader'].includes(user.role);
-}
 
 // 404 catch-all
 app.use((req, res) => {
