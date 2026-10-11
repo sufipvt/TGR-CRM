@@ -53,6 +53,12 @@ const { formatMoney, formatDate, formatDateTime, formatMoneyPdf } = require('./u
 const { sendErrorPage } = require('./utils/errorPage');
 const { clean, cleanBody, objIdOrNull, escapeRegex } = require('./utils/request');
 const { isSuperAdmin, isAdminRole, isTeamLeader, isManager, isAdminOrMD } = require('./utils/roles');
+const { audit } = require('./services/audit');
+const { getSettings } = require('./services/settings');
+const { getNextCaller } = require('./services/assignment');
+const {
+  getTeamMemberIds, visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter, canEditLead
+} = require('./services/access');
 
 // ---------------------------------------------------------------------------
 // HELPERS
@@ -161,35 +167,6 @@ function pdfFooter(doc, pageNum, totalPages, companyName) {
     .text('Page ' + pageNum + ' of ' + totalPages, doc.page.width - 140, bottom, { width: 100, align: 'right' });
 }
 
-async function audit(userEmail, action, entity, entityId, details) {
-  try {
-    await AuditLog.create({ user_email: userEmail, action, entity, entity_id: entityId ? String(entityId) : '', details: details || {} });
-  } catch (e) { console.error('Audit log failed:', e.message); }
-}
-
-async function getSettings() {
-  const docs = await Setting.find();
-  const map = {
-    company_name: 'TrueGrowth Realty', currency: 'INR', currency_symbol: '\u20B9',
-    tax_rate: '0', booking_prefix: 'TG-', lead_prefix: 'LD-', default_commission: '0'
-  };
-  docs.forEach(d => { map[d.key] = d.value; });
-  return map;
-}
-
-async function getNextCaller() {
-  const callers = await User.find({ role: 'Sub Team Leader', status: 'Active' }).select('_id');
-  if (!callers.length) return null;
-  const counts = await Lead.aggregate([
-    { $match: { assigned_caller_id: { $in: callers.map(c => c._id) } } },
-    { $group: { _id: '$assigned_caller_id', count: { $sum: 1 } } }
-  ]);
-  const countMap = {};
-  callers.forEach(c => { countMap[String(c._id)] = 0; });
-  counts.forEach(c => { countMap[String(c._id)] = c.count; });
-  return callers.sort((a, b) => countMap[String(a._id)] - countMap[String(b._id)])[0]._id;
-}
-
 // Replaces an N-users x 4-queries loop with 3 fixed queries total, regardless of team size.
 async function buildPerformanceReport(perfUsers, bookingRangeFilter) {
   const userIds = perfUsers.map(u => u._id);
@@ -266,58 +243,6 @@ async function resolveReportScope(user, scopeParam) {
     return { label: 'My Team', memberIds: teamMemberIds };
   }
   return { label: user.name, memberIds: [new Types.ObjectId(user.userId)] };
-}
-
-// Get all Sub-TL user IDs under a Team Leader's team
-async function getTeamMemberIds(user) {
-  if (!user.team_id) return [];
-  const members = await User.find({ team_id: user.team_id }).select('_id');
-  return members.map(m => m._id);
-}
-
-// Visibility filters per role
-async function visibleLeadFilter(user) {
-  if (isAdminRole(user.role)) return {};
-  if (isTeamLeader(user.role)) {
-    const memberIds = await getTeamMemberIds(user);
-    return {
-      $or: [
-        { assigned_caller_id: { $in: memberIds } },
-        { assigned_closer_id: { $in: memberIds } }
-      ]
-    };
-  }
-  // Sub Team Leader — sees only own leads (as caller or closer)
-  const uid = new Types.ObjectId(user.userId);
-  return { $or: [{ assigned_caller_id: uid }, { assigned_closer_id: uid }] };
-}
-async function visibleFollowUpFilter(user) {
-  if (isAdminRole(user.role)) return {};
-  if (isTeamLeader(user.role)) {
-    const memberIds = await getTeamMemberIds(user);
-    return { assigned_to_id: { $in: memberIds } };
-  }
-  return { assigned_to_id: new Types.ObjectId(user.userId) };
-}
-async function visibleBookingFilter(user) {
-  if (isAdminRole(user.role)) return {};
-  if (isTeamLeader(user.role)) {
-    const memberIds = await getTeamMemberIds(user);
-    return { closer_id: { $in: memberIds } };
-  }
-  return { closer_id: new Types.ObjectId(user.userId) };
-}
-async function canEditLead(user, leadId) {
-  if (isAdminRole(user.role)) return true;
-  const lead = await Lead.findById(leadId).select('assigned_caller_id assigned_closer_id');
-  if (!lead) return false;
-  const uid = String(user.userId);
-  if (String(lead.assigned_caller_id || '') === uid || String(lead.assigned_closer_id || '') === uid) return true;
-  if (isTeamLeader(user.role)) {
-    const memberIds = (await getTeamMemberIds(user)).map(String);
-    return memberIds.includes(String(lead.assigned_caller_id || '')) || memberIds.includes(String(lead.assigned_closer_id || ''));
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------------------
