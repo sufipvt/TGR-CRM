@@ -1,0 +1,14 @@
+<!-- TOPBAR -->
+<header class="tg-topbar">
+  <button class="tg-hamburger" id="tgHamburger" aria-label="Open menu">
+    <i class="fa-solid fa-bars"></i>
+  </button>
+  <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
+  <div class="tg-profile">
+    <button class="tg-theme-toggle" id="tgThemeToggle" onclick="tgToggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <i class="fa-solid fa-moon" id="tgThemeIcon" aria-hidden="true"></i>
+    </button>
+    <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
+    <span class="tg-profile-pill"><%= user.name %> <span class="badge tg-role-badge"><%= user.role %></span></span>
+  </div>
+</header>

@@ -1,0 +1,20 @@
+<!-- SIDEBAR -->
+<nav class="tg-sidebar" aria-label="Main navigation">
+  <div class="tg-sidebar-brand">
+    <div class="tg-logo" aria-hidden="true">TG</div>
+    <div>
+      <div class="tg-brand-name">TrueGrowth</div>
+      <div class="tg-brand-sub">Real Estate CRM</div>
+    </div>
+  </div>
+  <div class="tg-nav">
+    <% navItems.forEach(item => { %>
+      <a href="/app?page=<%= item.page %>" class="tg-nav-link <%= page === item.page ? 'active' : '' %>">
+        <i class="fa-solid <%= item.icon %>" aria-hidden="true"></i> <%= item.label %>
+      </a>
+    <% }) %>
+  </div>
+  <div class="tg-sidebar-footer">
+    <a href="/logout" class="tg-nav-link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Logout</a>
+  </div>
+</nav>
