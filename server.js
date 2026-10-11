@@ -4,9 +4,7 @@
 //require('dotenv').config();
 //require('dotenv').config({ path: '.env.development.local' });
 //-------------------------------------------------------------------------
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config({ path: '.env.development.local' });
-}
+const { PORT, IS_PROD } = require('./config/env');
 
 const express = require('express');
 const mongoose = require('mongoose');
@@ -23,25 +21,9 @@ const path = require('path');
 const PDFDocument = require('pdfkit');
 const compression = require('compression');
 
-// ---------------------------------------------------------------------------
-// ENV VALIDATION
-// ---------------------------------------------------------------------------
-if (!process.env.MONGODB_URI || !process.env.JWT_SECRET) {
-  console.error('ERROR: MONGODB_URI and JWT_SECRET must be set in Render.com environment variables.');
-  process.exit(1);
-}
-if (process.env.JWT_SECRET.length < 32) {
-  console.error('ERROR: JWT_SECRET must be at least 32 characters.');
-  process.exit(1);
-}
-if (!process.env.SENDGRID_API_KEY) {
-  console.warn('WARN: SENDGRID_API_KEY not set — email digest will not send.');
-} else {
+if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 }
-
-const PORT = process.env.PORT || 3000;
-const IS_PROD = process.env.NODE_ENV === 'production';
 
 // If something truly unexpected slips through every try/catch, log it clearly and
 // exit deliberately rather than keep running in a possibly-corrupted state.
@@ -59,8 +41,10 @@ process.on('unhandledRejection', (reason) => {
 // MODELS
 // ---------------------------------------------------------------------------
 const { Schema, Types } = mongoose;
-
-const USER_ROLES = ['Super Admin', 'Admin', 'Team Leader', 'Sub Team Leader'];
+const {
+  USER_ROLES, LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, BAD_CONTACT_OUTCOMES,
+  NOT_INTERESTED_REASONS, LOST_REASONS, DISPOSITION_REASONS
+} = require('./config/constants');
 
 const User = mongoose.model('User', new Schema({
   full_name: { type: String, required: true },
@@ -105,27 +89,6 @@ const LeadSource = mongoose.model('LeadSource', new Schema({
   active:  { type: Boolean, default: true },
   notes:   String
 }));
-
-const LEAD_STATUSES = ['New', 'Working', 'Qualified', 'Site Visit Scheduled', 'Negotiation', 'Booked', 'Lost', 'Not Interested'];
-const LEAD_TEMPERATURES = ['Hot', 'Warm', 'Cold'];
-
-// Result of the LAST call attempt — independent of pipeline status
-const CONTACT_OUTCOMES = [
-  'Interested', 'Not Interested', 'Requested Callback',
-  'Not Reachable', 'Switched Off', 'Call Rejected', 'Invalid Number'
-];
-const BAD_CONTACT_OUTCOMES = ['Not Reachable', 'Switched Off', 'Call Rejected', 'Invalid Number'];
-
-// WHY a lead rejected the property — only relevant once status is Not Interested or Lost
-const NOT_INTERESTED_REASONS = [
-  'Budget Mismatch', 'Location Mismatch', 'Timeline Mismatch (not buying soon)',
-  'Property Type Mismatch', 'Already Purchased Elsewhere', 'Other'
-];
-const LOST_REASONS = [
-  'Chose a Competitor Project', 'Price Negotiation Failed',
-  'Financing / Loan Rejected', 'Changed Mind', 'Other'
-];
-const DISPOSITION_REASONS = [...new Set([...NOT_INTERESTED_REASONS, ...LOST_REASONS])];
 
 const Lead = mongoose.model('Lead', new Schema({
   name:               { type: String, required: true },
