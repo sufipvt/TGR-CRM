@@ -1,28 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <script>
-    (function() {
-      var theme = localStorage.getItem('tgTheme') || 'light';
-      document.documentElement.setAttribute('data-bs-theme', theme);
-    })();
-  </script>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= page.charAt(0).toUpperCase() + page.slice(1) %> — TrueGrowth CRM</title>
-  <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link href="/app.css" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/js/bootstrap.bundle.min.js" defer></script>
-  <% if (page === 'dashboard') { %>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
-  <% } %>
-  <script src="/app.js" defer></script>
-</head>
+<%- include('partials/head') -%>
 <body>
 <%
   const isSuperAdmin = user.role === 'Super Admin';
@@ -52,50 +30,13 @@
   const statusColors = { 'New': 'primary', 'Working': 'warning', 'Qualified': 'info', 'Site Visit Scheduled': 'secondary', 'Negotiation': 'dark', 'Booked': 'success', 'Lost': 'danger', 'Not Interested': 'danger' };
 %>
 
-<!-- SIDEBAR -->
-<nav class="tg-sidebar" aria-label="Main navigation">
-  <div class="tg-sidebar-brand">
-    <div class="tg-logo" aria-hidden="true">TG</div>
-    <div>
-      <div class="tg-brand-name">TrueGrowth</div>
-      <div class="tg-brand-sub">Real Estate CRM</div>
-    </div>
-  </div>
-  <div class="tg-nav">
-    <% navItems.forEach(item => { %>
-      <a href="/app?page=<%= item.page %>" class="tg-nav-link <%= page === item.page ? 'active' : '' %>">
-        <i class="fa-solid <%= item.icon %>" aria-hidden="true"></i> <%= item.label %>
-      </a>
-    <% }) %>
-  </div>
-  <div class="tg-sidebar-footer">
-    <a href="/logout" class="tg-nav-link"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> Logout</a>
-  </div>
-</nav>
+<%- include('partials/sidebar', { navItems }) -%>
 
-<!-- TOPBAR -->
-<header class="tg-topbar">
-  <button class="tg-hamburger" id="tgHamburger" aria-label="Open menu">
-    <i class="fa-solid fa-bars"></i>
-  </button>
-  <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
-  <div class="tg-profile">
-    <button class="tg-theme-toggle" id="tgThemeToggle" onclick="tgToggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
-      <i class="fa-solid fa-moon" id="tgThemeIcon" aria-hidden="true"></i>
-    </button>
-    <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
-    <span class="tg-profile-pill"><%= user.name %> <span class="badge tg-role-badge"><%= user.role %></span></span>
-  </div>
-</header>
+<%- include('partials/topbar', { pageTitles }) -%>
 
 <!-- CONTENT -->
 <main class="tg-content">
-  <% if (success_msg) { %>
-    <div class="alert <%= success_msg.startsWith('Error') ? 'alert-danger' : 'alert-success' %> alert-dismissible fade show" role="alert">
-      <%= success_msg %>
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-  <% } %>
+<%- include('partials/flash') -%>
 
   <%# ======================= DASHBOARD ======================= %>
   <% if (page === 'dashboard') { %>
@@ -1650,116 +1591,10 @@
     </div>
 
   <% } %>
-  <!-- Complete Follow-Up Modal -->
-<div class="modal fade" id="completeModal" tabindex="-1">
-  <div class="modal-dialog modal-sm">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">Mark Complete</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <label class="form-label fw-medium">Outcome <span class="text-secondary">(optional)</span></label>
-        <textarea class="form-control" id="completeOutcomeInput" rows="2"
-          placeholder="e.g. Interested, will visit Saturday"></textarea>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button class="btn btn-success" id="confirmCompleteBtn">
-          <i class="fa-solid fa-check me-1"></i>Mark Done
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
+<%- include('partials/complete-followup-modal') -%>
 </main>
-<div class="tg-sidebar-backdrop" id="tgBackdrop"></div>
-<script>
-  const tgHamburger = document.getElementById('tgHamburger');
-  const tgSidebar   = document.querySelector('.tg-sidebar');
-  const tgBackdrop  = document.getElementById('tgBackdrop');
+<%- include('partials/sidebar-script') -%>
 
-  function openSidebar() {
-    tgSidebar.classList.add('open');
-    tgBackdrop.classList.add('show');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeSidebar() {
-    tgSidebar.classList.remove('open');
-    tgBackdrop.classList.remove('show');
-    document.body.style.overflow = '';
-  }
-
-  tgHamburger?.addEventListener('click', openSidebar);
-  tgBackdrop?.addEventListener('click', closeSidebar);
-
-  // Close sidebar when a nav link is tapped on mobile
-  document.querySelectorAll('.tg-nav-link').forEach(link => {
-    link.addEventListener('click', closeSidebar);
-  });
-</script>
-
-<!-- ========== CHAT BUBBLE ========== -->
-<div id="tgChatBubble" style="
-  position:fixed; bottom:24px; right:24px; z-index:2000;
-  display:flex; flex-direction:column; align-items:flex-end; gap:12px;">
-
-  <!-- Chat Window -->
-  <div id="tgChatWindow" style="
-    display:none; width:340px; height:460px;
-    background:#fff; border-radius:16px;
-    box-shadow:0 8px 32px rgba(0,0,0,0.18);
-    border:1px solid var(--border);
-    display:none; flex-direction:column; overflow:hidden;">
-
-    <!-- Header -->
-    <div style="background:var(--brand);padding:14px 16px;display:flex;align-items:center;gap:10px;">
-      <div style="width:32px;height:32px;background:rgba(255,255,255,0.2);border-radius:50%;
-        display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;">
-        <i class="fa-solid fa-robot"></i>
-      </div>
-      <div>
-        <div style="color:#fff;font-weight:700;font-size:14px;">TG Assistant</div>
-        <div style="color:rgba(255,255,255,0.8);font-size:11px;">Ask me anything about your CRM</div>
-      </div>
-      <button onclick="tgToggleChat()" style="margin-left:auto;background:none;border:none;
-        color:#fff;font-size:18px;cursor:pointer;padding:4px;">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-
-    <!-- Messages -->
-    <div id="tgChatMessages" style="flex:1;overflow-y:auto;padding:14px;
-      display:flex;flex-direction:column;gap:10px;background:#f8fafc;">
-      <!-- Welcome message -->
-      <div class="tg-msg-bot">
-        👋 Hi <strong><%= user.full_name %></strong>! I'm your CRM assistant.<br>
-        Type <code>/help</code> to see commands or ask anything!
-      </div>
-    </div>
-
-    <!-- Input -->
-    <div style="padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;background:#fff;">
-      <input type="text" id="tgChatInput" placeholder="Ask or type /help..."
-        style="flex:1;padding:8px 12px;border:1px solid var(--border);
-        border-radius:8px;font-size:13px;outline:none;"
-        onkeydown="if(event.key==='Enter') tgSendChat()">
-      <button onclick="tgSendChat()" style="background:var(--brand);color:#fff;
-        border:none;border-radius:8px;padding:8px 14px;cursor:pointer;font-size:14px;">
-        <i class="fa-solid fa-paper-plane"></i>
-      </button>
-    </div>
-  </div>
-
-  <!-- Toggle Button -->
-  <button onclick="tgToggleChat()" id="tgChatBtn" style="
-    width:52px;height:52px;border-radius:50%;
-    background:var(--brand);color:#fff;border:none;
-    font-size:20px;cursor:pointer;
-    box-shadow:0 4px 16px rgba(26,86,219,0.4);
-    display:flex;align-items:center;justify-content:center;">
-    <i class="fa-solid fa-robot"></i>
-  </button>
-</div>
+<%- include('partials/chat-widget') -%>
 </body>
 </html>
