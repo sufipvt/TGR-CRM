@@ -11,6 +11,7 @@ const { formatMoney } = require('../../utils/format');
 const { cleanBody, objIdOrNull } = require('../../utils/request');
 const { isSuperAdmin, isAdminRole, isTeamLeader, isManager } = require('../../utils/roles');
 const { audit } = require('../../services/audit');
+const { clearSettingsCache } = require('../../services/settings');
 const { getNextCaller } = require('../../services/assignment');
 const { canEditLead, canActForUser, canAssignTo } = require('../../services/access');
 const { userContextCache } = require('../../middleware/auth');
@@ -352,6 +353,7 @@ async function handlePostAction(req) {
           await Setting.findOneAndUpdate({ key }, { key, value: body[key] }, { upsert: true });
         }
       }
+      clearSettingsCache();
       await audit(user.email, 'update', 'Settings', '', {});
       return 'Settings saved.';
     }

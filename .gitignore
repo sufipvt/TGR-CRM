@@ -1,15 +1,14 @@
-# v0 sandbox internal files
-__v0_runtime_loader.js
-__v0_devtools.tsx
-__v0_jsx-dev-runtime.ts
-.snowflake/
-.v0-trash/
+# Dependencies
+node_modules/
+
+# Environment files: real values never go in git (see .env.example)
+.env
+.env.*
+!.env.example
+
+# Platform / editor leftovers
 .vercel/
-
-# Environment variables
-.env*.local
-
-# Common ignores
-node_modules
-.next/
 .DS_Store
+*.log
+npm-debug.log*
+coverage/

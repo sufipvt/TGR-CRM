@@ -1,4 +1,4 @@
-// TrueGrowth CRM — client-side JS
+// CRM client-side JS
 // Charts, filters, timeline offcanvas, dynamic unit loading, CSV helpers, modal edit forms.
 
 const fmt = {
@@ -269,7 +269,7 @@ function tgDownloadSampleCsv() {
   const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'truegrowth-leads-template.csv';
+  a.download = 'leads-template.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -416,7 +416,7 @@ function tgExportBookingsCsv() {
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'truegrowth-bookings.csv';
+  a.download = 'bookings.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }

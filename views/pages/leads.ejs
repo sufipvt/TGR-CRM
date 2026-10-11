@@ -79,7 +79,7 @@
                 <td class="text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
                 <td class="text-nowrap">
                   <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
-                     href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>"
+                     href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>"
                      title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
                   <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
                   <% if (canEdit) { %>
@@ -208,7 +208,7 @@
                         </button>
                         <a class="btn btn-sm py-0 px-1 btn-outline-success" target="_blank" rel="noopener"
                            title="WhatsApp" aria-label="WhatsApp"
-                           href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is TrueGrowth Realty.') %>">
+                           href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>">
                           <i class="fa-brands fa-whatsapp" style="font-size:10px;" aria-hidden="true"></i>
                         </a>
                       </div>

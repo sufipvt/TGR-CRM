@@ -20,3 +20,10 @@ for (const who of ['superAdmin', 'admin', 'tlA', 'subA']) {
   });
 }
 
+
+test('branding follows the company name in Settings', async () => {
+  const r = await as(f.superAdmin).post('/app?page=settings', { action: 'save_settings', company_name: 'Skyline Homes' });
+  assert.equal(r.msg, 'Settings saved.');
+  const html = await (await as(f.superAdmin).get('/login')).text();
+  assert.match(html, /Skyline Homes — Real Estate Sales CRM/);
+});

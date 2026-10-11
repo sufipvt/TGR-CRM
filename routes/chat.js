@@ -6,6 +6,7 @@ const { escapeRegex } = require('../utils/request');
 const { visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter } = require('../services/access');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { chatLimiter } = require('../middleware/rateLimits');
+const { getSettings, APP_NAME } = require('../services/settings');
 
 const router = express.Router();
 
@@ -156,6 +157,7 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
         { $lookup: { from: 'leadsources', localField: '_id', foreignField: '_id', as: 'src' } }
       ])
     ]);
+    const settings = await getSettings();
     const projectSummary = projectsList.map(p =>
       `  - ${p.name} | Type: ${p.project_type || '—'} | City: ${p.city || '—'} | Status: ${p.status} | Price: ${p.price_range || '—'} | Units: ${p.available_units}/${p.total_units} available | Notes: ${p.notes || '—'}`
     ).join('\n');
@@ -164,7 +166,7 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
     const sourceSummary = topSources.map(s => `${s.src[0]?.name || '—'}: ${s.count}`).join(', ');
 
     const systemPrompt =
-      `You are TG Assistant, the AI helper for TrueGrowth CRM — a real estate sales CRM used in India.\n` +
+      `You are the AI assistant inside ${APP_NAME}, the real estate sales CRM of ${settings.company_name}, used in India.\n` +
       `You only answer questions about CRM data. Be concise, helpful, and use Indian context (₹ for currency).\n` +
       `Logged in user: ${user.name} (${user.role}). The lead, follow-up and booking numbers below cover ${scopeLabel}.\n` +
       `CRM Data:\n` +

@@ -1,7 +1,9 @@
 // Standalone HTML error page used for 404s, 500s and failed page loads.
+const { APP_NAME } = require('../services/settings');
+
 function sendErrorPage(res, status, message) {
   res.status(status).send(`<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>TrueGrowth CRM</title>
+<html><head><meta charset="UTF-8"><title>${APP_NAME}</title>
 <style>
   body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f8fafc; color:#111827; display:flex; align-items:center; justify-content:center; min-height:100vh; margin:0; }
   .box { text-align:center; padding:40px; max-width:420px; }

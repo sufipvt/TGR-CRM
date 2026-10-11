@@ -1,4 +1,4 @@
-// TrueGrowth CRM — server.js
+// CRM server — server.js
 // Node.js + Express + MongoDB (Mongoose) + EJS + SendGrid + node-cron
 //-------------------------------------------------------------------------
 //require('dotenv').config();
@@ -51,6 +51,7 @@ app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 app.use(require('./middleware/sanitize').sanitizeInput);
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: '1d' }));
+app.use(require('./middleware/brand').brandLocals);
 
 app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
@@ -127,7 +128,7 @@ if (require.main === module) {
     .then(async () => {
       console.log('MongoDB connected');
       await initAdmin();
-      app.listen(PORT, () => console.log('TrueGrowth CRM running on port ' + PORT));
+      app.listen(PORT, () => console.log('CRM running on port ' + PORT));
     })
     .catch(err => {
       console.error('MongoDB connection failed:', err.message);

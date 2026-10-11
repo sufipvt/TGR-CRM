@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sign In — TrueGrowth CRM</title>
+  <title>Sign In — <%= brand.appName %></title>
   <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -52,7 +52,7 @@
 <body>
   <main class="login-card">
     <div class="brand-logo" aria-hidden="true">TG</div>
-    <h1 class="h4 text-center fw-bold mb-1">TrueGrowth CRM</h1>
+    <h1 class="h4 text-center fw-bold mb-1"><%= brand.appName %></h1>
     <p class="text-center text-secondary mb-4" style="font-size:14px;">Sign in to your account</p>
 
     <% if (error) { %>
@@ -71,7 +71,7 @@
       <button type="submit" class="btn btn-brand w-100">Sign In</button>
     </form>
 
-    <p class="text-center text-secondary mt-4 mb-0" style="font-size:12px;">TrueGrowth Realty — Real Estate Sales CRM</p>
+    <p class="text-center text-secondary mt-4 mb-0" style="font-size:12px;"><%= brand.company %> — Real Estate Sales CRM</p>
   </main>
 </body>
 </html>

@@ -1,6 +1,7 @@
 // Daily follow-up email digest (sent via SendGrid, scheduled from server.js)
 const sgMail = require('@sendgrid/mail');
 const { User, FollowUp, Lead } = require('../models');
+const { APP_NAME } = require('./settings');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -28,13 +29,13 @@ function digestHtml(title, dateStr, kpis, sections) {
   return '<div style="background:#f4f7fe;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">' +
     '<div style="max-width:600px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e5e7eb;">' +
     '<div style="background:#082f49;padding:22px 24px;color:#ffffff;">' +
-    '<div style="font-size:18px;font-weight:700;">TrueGrowth CRM</div>' +
+    '<div style="font-size:18px;font-weight:700;">' + APP_NAME + '</div>' +
     '<div style="font-size:13px;opacity:0.8;margin-top:2px;">' + title + ' \u2014 ' + dateStr + '</div></div>' +
     '<div style="padding:18px 18px 8px;"><table width="100%" cellpadding="0" cellspacing="0"><tr>' + kpis + '</tr></table></div>' +
     '<div style="padding:8px 24px 8px;">' + sections + '</div>' +
     '<div style="padding:8px 24px 20px;text-align:center;">' +
     '<a href="' + (process.env.APP_URL || '#') + '" style="display:inline-block;background:#1a56db;color:#ffffff;text-decoration:none;border-radius:8px;padding:11px 26px;font-weight:600;font-size:14px;">Open CRM</a></div>' +
-    '<div style="padding:14px 24px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center;">You are receiving this because you have an active TrueGrowth CRM account. Manage notification preferences in the CRM.</div>' +
+    '<div style="padding:14px 24px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center;">You are receiving this because you have an active ' + APP_NAME + ' account. Manage notification preferences in the CRM.</div>' +
     '</div></div>';
 }
 
