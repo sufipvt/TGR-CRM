@@ -72,10 +72,10 @@ router.get('/app/report-pdf', requireAuth, expensiveOpLimiter, refreshUserContex
     };
 
    const settings = await getSettings();
-    const companyName = settings.company_name || 'TrueGrowth Realty';
+    const companyName = settings.company_name;
     const doc = new PDFDocument({ margin: 40, size: 'A4', bufferPages: true });
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'attachment; filename="TrueGrowth-Report-' + Date.now() + '.pdf"');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + (companyName.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'CRM') + '-Report-' + Date.now() + '.pdf"');
     doc.pipe(res);
 
     pdfHeader(doc, companyName, scope.label, from, to);

@@ -1,7 +1,7 @@
 # CLAUDE.md: TrueGrowth CRM
 
 A sales CRM for real estate firms: Express 4 + Mongoose 7 (MongoDB Atlas) + server-rendered EJS, deployed on Render.
-**Each client firm gets its own copy**: its own Render service and its own Atlas database. There is no tenant id in the data; never add cross-client logic.
+**Each client firm gets its own copy**: its own Render service and its own Atlas database. There is no tenant id in the data; never add cross-client logic. Never hardcode a company name: use `brand.*` in views (`middleware/brand.js`) and `APP_NAME` / `getSettings()` in code.
 
 ## Workflow
 - One small PR at a time. The owner tests it, then merges. Render auto-deploys `main` to production.

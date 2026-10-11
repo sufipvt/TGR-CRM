@@ -30,7 +30,7 @@
               const balance = (b.sale_value || 0) - paid;
             %>
               <tr data-status="<%= b.status %>" data-search="<%= ((b.lead_id ? b.lead_id.name : '') + ' ' + (b.project_id ? b.project_id.name : '') + ' ' + (b.unit_id ? b.unit_id.unit_number : '')).toLowerCase() %>">
-                <td class="fw-medium">TG-<%= String(b._id).slice(-8).toUpperCase() %></td>
+                <td class="fw-medium"><%= brand.refPrefix %><%= String(b._id).slice(-8).toUpperCase() %></td>
                 <td><%= b.lead_id ? b.lead_id.name : '—' %></td>
                 <td><%= b.project_id ? b.project_id.name : '—' %></td>
                 <td><%= b.unit_id ? b.unit_id.unit_number : '—' %></td>

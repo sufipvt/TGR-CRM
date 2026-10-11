@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Booking Receipt TG-<%= String(booking._id).slice(-8).toUpperCase() %> — TrueGrowth CRM</title>
+  <title>Booking Receipt <%= brand.refPrefix %><%= String(booking._id).slice(-8).toUpperCase() %> — <%= brand.appName %></title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
     @page { size: A4; margin: 20mm; }
@@ -47,7 +47,7 @@
         <div class="brand-sub">Real Estate Sales &amp; Advisory</div>
       </div>
       <div class="ref">
-        <div class="ref-num">TG-<%= String(booking._id).slice(-8).toUpperCase() %></div>
+        <div class="ref-num"><%= brand.refPrefix %><%= String(booking._id).slice(-8).toUpperCase() %></div>
         <div class="ref-date"><%= new Date(booking.booking_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) %></div>
       </div>
     </div>
@@ -109,7 +109,7 @@
       </div>
     </div>
 
-    <div class="footer">This is a computer-generated receipt. &mdash; TrueGrowth CRM</div>
+    <div class="footer">This is a computer-generated receipt. &mdash; <%= brand.appName %></div>
     <button class="print-btn" onclick="window.print()">Print / Save PDF</button>
   </main>
 </body>
