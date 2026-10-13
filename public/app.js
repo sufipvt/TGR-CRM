@@ -393,8 +393,20 @@ function tgResetProjectForm() {
   if (form) form.reset();
   setVal('prAction', 'add_project');
   setVal('prId', '');
+  tgLockUnitCounts(false);
   const title = document.getElementById('projectModalTitle');
   if (title) title.textContent = 'Add Project';
+}
+
+// A project with units gets its counts from them, so the typed fields are locked.
+// Disabled inputs aren't submitted, and update_project then leaves the stored numbers alone.
+function tgLockUnitCounts(locked) {
+  ['pr_total', 'pr_avail'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !!locked;
+  });
+  const hint = document.getElementById('pr_units_hint');
+  if (hint) hint.hidden = !locked;
 }
 
 function tgEditProject(p) {
@@ -409,6 +421,7 @@ function tgEditProject(p) {
   setVal('pr_status', p.status);
   setVal('pr_total', p.total_units);
   setVal('pr_avail', p.available_units);
+  tgLockUnitCounts(p.from_units);
   setVal('pr_price', p.price_range);
   setVal('pr_notes', p.notes);
   const title = document.getElementById('projectModalTitle');

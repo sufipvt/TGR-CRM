@@ -144,12 +144,15 @@ async function handlePostAction(req) {
     }
     case 'update_project': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      await Project.findByIdAndUpdate(body.project_id, {
+      const update = {
         name: body.name, developer: body.developer, location: body.location, city: body.city,
         state: body.state, project_type: body.project_type, status: body.status,
-        total_units: Number(body.total_units || 0), available_units: Number(body.available_units || 0),
         price_range: body.price_range, notes: body.notes
-      });
+      };
+      // Locked (not sent) when the project has units: its counts come from them.
+      if (body.total_units !== undefined) update.total_units = Number(body.total_units || 0);
+      if (body.available_units !== undefined) update.available_units = Number(body.available_units || 0);
+      await Project.findByIdAndUpdate(body.project_id, update);
       await audit(user.email, 'update', 'Project', body.project_id, { name: body.name });
       return 'Project updated.';
     }

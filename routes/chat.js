@@ -7,6 +7,7 @@ const { visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter } = requi
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { chatLimiter } = require('../middleware/rateLimits');
 const { getSettings, APP_NAME } = require('../services/settings');
+const { unitCountsByProject, unitCountsFor } = require('../services/inventory');
 
 const router = express.Router();
 
@@ -158,7 +159,8 @@ router.post('/api/chat', requireAuth, chatLimiter, refreshUserContext, async (re
       ])
     ]);
     const settings = await getSettings();
-    const projectSummary = projectsList.map(p =>
+    const unitCounts = await unitCountsByProject();
+    const projectSummary = projectsList.map(p => ({ ...p, ...unitCountsFor(p, unitCounts) })).map(p =>
       `  - ${p.name} | Type: ${p.project_type || '—'} | City: ${p.city || '—'} | Status: ${p.status} | Price: ${p.price_range || '—'} | Units: ${p.available_units}/${p.total_units} available | Notes: ${p.notes || '—'}`
     ).join('\n');
     const totalRevenue = revenueAgg[0]?.total || 0;
