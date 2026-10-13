@@ -1,24 +1,37 @@
     <div class="tg-panel">
+      <%
+        const L = data.lead_list; const hasFilter = L.q || L.status || L.source || L.project || L.temperature;
+        const listQs = new URLSearchParams(Object.assign({},
+          L.q ? { q: L.q } : {}, L.status ? { status: L.status } : {}, L.source ? { source: L.source } : {},
+          L.project ? { project: L.project } : {}, L.temperature ? { temperature: L.temperature } : {},
+          L.page > 1 ? { p: L.page } : {})).toString();
+        const leadsUrl = '/app?page=leads' + (listQs ? '&' + listQs : '');
+      %>
       <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <input type="search" id="leadSearch" class="form-control" style="max-width:240px;" placeholder="Search name / phone / email" aria-label="Search leads">
-        <select id="leadStatusFilter" class="form-select" style="max-width:180px;" aria-label="Filter by status">
+        <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-center" id="leadFilterForm" role="search">
+        <input type="hidden" name="page" value="leads">
+        <input type="search" name="q" id="leadSearch" class="form-control" style="max-width:240px;" placeholder="Search name / phone / email" aria-label="Search leads" value="<%= L.q %>">
+        <select name="status" id="leadStatusFilter" class="form-select" style="max-width:180px;" aria-label="Filter by status" onchange="this.form.submit()">
           <option value="">All Statuses</option>
-          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>" <%= L.status === s ? 'selected' : '' %>><%= s %></option><% }) %>
         </select>
-        <select id="leadSourceFilter" class="form-select" style="max-width:180px;" aria-label="Filter by source">
+        <select name="source" id="leadSourceFilter" class="form-select" style="max-width:180px;" aria-label="Filter by source" onchange="this.form.submit()">
           <option value="">All Sources</option>
-          <% data.sources.forEach(s => { %><option value="<%= s.name %>"><%= s.name %></option><% }) %>
+          <% data.sources.forEach(s => { %><option value="<%= s._id %>" <%= L.source === String(s._id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
         </select>
-        <select id="leadProjectFilter" class="form-select" style="max-width:180px;" aria-label="Filter by project">
+        <select name="project" id="leadProjectFilter" class="form-select" style="max-width:180px;" aria-label="Filter by project" onchange="this.form.submit()">
           <option value="">All Projects</option>
-          <% data.projects.forEach(p => { %><option value="<%= p.name %>"><%= p.name %></option><% }) %>
+          <% data.projects.forEach(p => { %><option value="<%= p._id %>" <%= L.project === String(p._id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
         </select>
-        <select id="leadTemperatureFilter" class="form-select" style="max-width:160px;" aria-label="Filter by temperature">
+        <select name="temperature" id="leadTemperatureFilter" class="form-select" style="max-width:160px;" aria-label="Filter by temperature" onchange="this.form.submit()">
           <option value="">All Temperatures</option>
-          <option value="Hot">🔥 Hot</option>
-          <option value="Warm">☀️ Warm</option>
-          <option value="Cold">❄️ Cold</option>
+          <option value="Hot" <%= L.temperature === 'Hot' ? 'selected' : '' %>>🔥 Hot</option>
+          <option value="Warm" <%= L.temperature === 'Warm' ? 'selected' : '' %>>☀️ Warm</option>
+          <option value="Cold" <%= L.temperature === 'Cold' ? 'selected' : '' %>>❄️ Cold</option>
         </select>
+        <button type="submit" class="btn btn-outline-secondary" aria-label="Search"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+        <% if (hasFilter) { %><a class="btn btn-link px-1" href="/app?page=leads">Clear</a><% } %>
+        </form>
         <div class="ms-auto d-flex gap-2">
           <div class="btn-group" role="group" aria-label="View toggle">
             <button id="tgViewTable" type="button" class="btn btn-sm btn-primary"
@@ -45,7 +58,7 @@
           </thead>
           <tbody>
             <% if (!data.leads.length) { %>
-              <tr><td colspan="9" class="text-secondary text-center py-4">No leads found. Add your first lead to get started.</td></tr>
+              <tr><td colspan="10" class="text-secondary text-center py-4"><%= hasFilter ? 'No leads match these filters.' : 'No leads found. Add your first lead to get started.' %></td></tr>
             <% } %>
             <% data.leads.forEach(lead => { %>
               <%
@@ -87,13 +100,13 @@
                       onclick='tgShowNiModal("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)'>NI</button>
                     <button type="button" class="btn btn-sm btn-outline-secondary" title="Could not connect" aria-label="Log contact attempt"
                       onclick='tgShowContactOutcomeModal("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)'><i class="fa-solid fa-phone-slash" aria-hidden="true"></i></button>
-                    <form method="POST" action="/app?page=leads" style="display:inline">
+                    <form method="POST" action="<%= leadsUrl %>" style="display:inline">
                       <input type="hidden" name="action" value="quick_disposition">
                       <input type="hidden" name="lead_id" value="<%= lead._id %>">
                       <input type="hidden" name="status" value="Working">
                       <button type="submit" class="btn btn-sm btn-outline-warning" title="Call Back / Working">CB</button>
                     </form>
-                    <form method="POST" action="/app?page=leads" style="display:inline">
+                    <form method="POST" action="<%= leadsUrl %>" style="display:inline">
                       <input type="hidden" name="action" value="quick_disposition">
                       <input type="hidden" name="lead_id" value="<%= lead._id %>">
                       <input type="hidden" name="status" value="Qualified">
@@ -112,7 +125,7 @@
                   <% } %>
                   <% if (isManager) { %>
                     <a class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"
-                       href="/app?page=leads&delete=1&table=leads&id=<%= lead._id %>"
+                       href="<%= leadsUrl %>&delete=1&table=leads&id=<%= lead._id %>"
                        onclick="return confirm('Delete this lead?')"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
                   <% } %>
                 </td>
@@ -222,13 +235,33 @@
       </div>
       <!-- ===== END KANBAN VIEW ===== -->
 
+      <% if (L.total > 0) { %>
+        <%
+          const pageHref = n => '/app?' + new URLSearchParams(Object.assign({ page: 'leads' },
+            L.q ? { q: L.q } : {}, L.status ? { status: L.status } : {}, L.source ? { source: L.source } : {},
+            L.project ? { project: L.project } : {}, L.temperature ? { temperature: L.temperature } : {}, { p: n })).toString();
+        %>
+        <nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3" aria-label="Lead pages">
+          <span class="text-secondary" style="font-size:13px;">
+            Showing <%= (L.page - 1) * L.per + 1 %>–<%= Math.min(L.page * L.per, L.total) %> of <%= L.total.toLocaleString('en-IN') %> leads
+          </span>
+          <% if (L.pages > 1) { %>
+            <ul class="pagination pagination-sm mb-0">
+              <li class="page-item <%= L.page <= 1 ? 'disabled' : '' %>"><a class="page-link" href="<%= pageHref(L.page - 1) %>">Previous</a></li>
+              <li class="page-item disabled"><span class="page-link">Page <%= L.page %> of <%= L.pages %></span></li>
+              <li class="page-item <%= L.page >= L.pages ? 'disabled' : '' %>"><a class="page-link" href="<%= pageHref(L.page + 1) %>">Next</a></li>
+            </ul>
+          <% } %>
+        </nav>
+      <% } %>
+
     </div><!-- closes tg-panel -->
 
     <!-- Add/Edit Lead Modal -->
     <div class="modal fade" id="leadModal" tabindex="-1" aria-labelledby="leadModalTitle" aria-hidden="true">
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
-          <form method="POST" action="/app?page=leads">
+          <form method="POST" action="<%= leadsUrl %>">
             <div class="modal-header">
               <h2 class="modal-title h5" id="leadModalTitle">Add Lead</h2>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -447,7 +480,7 @@
     </div>
 
     <!-- Hidden form for NI submission -->
-    <form method="POST" action="/app?page=leads" id="niForm" class="d-none">
+    <form method="POST" action="<%= leadsUrl %>" id="niForm" class="d-none">
       <input type="hidden" name="action" value="quick_disposition">
       <input type="hidden" name="lead_id" id="niLeadId">
       <input type="hidden" name="status" value="Not Interested">
@@ -477,7 +510,7 @@
         </div>
       </div>
     </div>
-    <form method="POST" action="/app?page=leads" id="coForm" class="d-none">
+    <form method="POST" action="<%= leadsUrl %>" id="coForm" class="d-none">
       <input type="hidden" name="action" value="quick_contact_outcome">
       <input type="hidden" name="lead_id" id="coLeadId">
       <input type="hidden" name="contact_outcome" id="coOutcome">
