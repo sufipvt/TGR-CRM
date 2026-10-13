@@ -27,9 +27,12 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
 
       // If mapping provided → keep original header casing; else → lowercase (standard template)
       const records = parseCsvSync(req.file.buffer, {
-        columns: mapping
-          ? h => h.map(c => c.trim())
-          : h => h.map(c => c.trim().toLowerCase()),
+        // Header names become object keys: drop any that could reach an object's
+        // prototype (csv-parse advisory GHSA-8cw4-87c7-c6xx).
+        columns: h => h.map(c => {
+          const name = mapping ? c.trim() : c.trim().toLowerCase();
+          return ['__proto__', 'constructor', 'prototype'].includes(name) ? false : name;
+        }),
         skip_empty_lines: true,
         trim: true
       });
