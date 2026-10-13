@@ -18,3 +18,12 @@ test('the 404 page shows the request id as a reference', async () => {
   const id = r.headers.get('x-request-id');
   assert.ok((await r.text()).includes('Reference: ' + id));
 });
+
+test('pages send a Content Security Policy that blocks framing and foreign scripts', async () => {
+  const r = await fetch(baseUrl() + '/login');
+  const csp = r.headers.get('content-security-policy') || '';
+  assert.match(csp, /frame-ancestors 'none'/);
+  assert.match(csp, /object-src 'none'/);
+  assert.match(csp, /form-action 'self'/);
+  assert.match(csp, /script-src 'self' 'unsafe-inline' https:\/\/cdnjs\.cloudflare\.com(;|$)/);
+});

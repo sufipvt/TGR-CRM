@@ -45,8 +45,29 @@ app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
 app.use(require('./middleware/requestLog').requestLog);
 app.use(compression());
+// Content Security Policy: the browser only runs scripts and loads styles/fonts from
+// this site and the two CDNs below, never lets the app be framed, and only lets
+// forms post back here. Inline <script> blocks and onclick="" handlers are still
+// allowed ('unsafe-inline') because the views use them throughout.
+const CDN = 'https://cdnjs.cloudflare.com';
 app.use(helmet({
-  contentSecurityPolicy: false
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", CDN],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", CDN, 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'data:', CDN, 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:'],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+      ...(process.env.NODE_ENV === 'production' ? { upgradeInsecureRequests: [] } : {})
+    }
+  }
 }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 app.use(express.json({ limit: '1mb' }));
