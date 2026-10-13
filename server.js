@@ -33,6 +33,7 @@ process.on('unhandledRejection', (reason) => {
 const { User } = require('./models');
 const { formatMoney, formatDate, formatDateTime, toDateTimeInput } = require('./utils/format');
 const { sendErrorPage } = require('./utils/errorPage');
+const { logError } = require('./middleware/requestLog');
 const { sendDailyDigest } = require('./services/digest');
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,7 @@ const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
+app.use(require('./middleware/requestLog').requestLog);
 app.use(compression());
 app.use(helmet({
   contentSecurityPolicy: false
@@ -78,13 +80,12 @@ app.use(require('./routes/chat'));
 
 // 404 catch-all
 app.use((req, res) => {
-  console.log('404:', req.method, req.url);
   sendErrorPage(res, 404, 'The page you\u2019re looking for doesn\u2019t exist.');
 });
 
 // Global error handler \u2014 catches anything that slips past every route's own try/catch
 app.use((err, req, res, next) => {
-  console.error('Unhandled route error:', err);
+  logError(req, 'unhandled', err);
   if (res.headersSent) return next(err);
   sendErrorPage(res, 500, 'Something went wrong on our end. Please try again.');
 });

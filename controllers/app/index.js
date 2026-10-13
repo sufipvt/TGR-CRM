@@ -5,6 +5,7 @@ const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team, AuditLog
 } = require('../../models');
 const { sendErrorPage } = require('../../utils/errorPage');
+const { logError } = require('../../middleware/requestLog');
 const { isSuperAdmin, isAdminRole, isTeamLeader, isManager } = require('../../utils/roles');
 const { getSettings } = require('../../services/settings');
 const {
@@ -205,7 +206,7 @@ async function appHandler(req, res) {
 
     res.render('app', { page, user, data, success_msg });
   } catch (e) {
-    console.error('appHandler error:', e);
+    logError(req, 'appHandler', e);
     sendErrorPage(res, 500, 'We hit an unexpected error loading this page. Please try again, and contact support if it continues.');
   }
 }

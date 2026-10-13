@@ -16,7 +16,8 @@ function sendErrorPage(res, status, message) {
   <div class="icon">\u26A0\uFE0F</div>
   <h1>Something went wrong</h1>
   <p>${message}</p>
-  <a href="/app">Return to Dashboard</a>
+  <a href="/app">Return to Dashboard</a>${res.locals && res.locals.requestId ? `
+  <p style="margin-top:24px;font-size:12px;">Reference: ${res.locals.requestId}</p>` : ''}
 </div></body></html>`);
 }
 
