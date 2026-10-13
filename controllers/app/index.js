@@ -31,19 +31,10 @@ async function appHandler(req, res) {
     // POST actions
     if (req.method === 'POST' && req.body && req.body.action) {
       try {
-        const msg = await handlePostAction(req);
+        const msg = req.body.action === 'delete'
+          ? (await handleDelete(req), 'Deleted successfully.')
+          : await handlePostAction(req);
         return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent(msg));
-      } catch (e) {
-        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
-        throw e;
-      }
-    }
-
-    // DELETE via GET query
-    if (req.query.delete && req.query.table && req.query.id) {
-      try {
-        await handleDelete(req);
-        return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Deleted successfully.'));
       } catch (e) {
         if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
         throw e;

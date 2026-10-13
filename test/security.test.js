@@ -13,15 +13,20 @@ test('lead names are HTML-escaped inside Edit button attributes', async () => {
   assert.ok(!/onclick='[^']*D'Souza/.test(html), 'raw apostrophe never lands inside an onclick');
 });
 
-test('operator injection in a delete link is refused and deletes nothing', async () => {
+test('operator injection in a delete is refused and deletes nothing', async () => {
   const before = await models.FollowUp.countDocuments();
-  const r = await as(f.superAdmin).get('/app?page=leads&delete=1&table=leads&id[$exists]=true');
+  const r = await as(f.superAdmin).post('/app?page=leads', { action: 'delete', table: 'leads', 'id[$exists]': 'true' });
   assert.equal(r.msg, 'Error: Invalid id');
   assert.equal(await models.FollowUp.countDocuments(), before);
 });
 
+test('a delete link (GET) no longer deletes anything', async () => {
+  await as(f.superAdmin).get(`/app?page=leads&delete=1&table=leads&id=${f.leadA._id}`);
+  assert.ok(await models.Lead.exists({ _id: f.leadA._id }));
+});
+
 test('Team Leader cannot delete a lead in another team', async () => {
-  const r = await as(f.tlA).get(`/app?page=leads&delete=1&table=leads&id=${f.leadB._id}`);
+  const r = await as(f.tlA).post('/app?page=leads', { action: 'delete', table: 'leads', id: String(f.leadB._id) });
   assert.match(r.msg, /^Error: Forbidden/);
   assert.ok(await models.Lead.exists({ _id: f.leadB._id }));
 });

@@ -42,8 +42,7 @@
                           scheduled_date: toDateTimeInput(f.scheduled_date),
                           type: f.type, status: f.status, outcome: f.outcome || "", notes: f.notes || ""
                         }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
-                      <a class="btn btn-sm btn-outline-danger" href="/app?page=followups&delete=1&table=followups&id=<%= f._id %>"
-                         onclick="return confirm('Delete this follow-up?')" title="Delete" aria-label="Delete follow-up"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                      <form method="POST" action="/app?page=followups" class="d-inline" onsubmit="return confirm('Delete this follow-up?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="followups"><input type="hidden" name="id" value="<%= f._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete follow-up"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                     </td>
                   </tr>
                 <% }) %>

@@ -62,3 +62,11 @@ test('a quick action returns to the same filtered page', async () => {
   const html = await page(f.admin, '&status=New&p=2');
   assert.ok(html.includes('action="/app?page=leads&amp;status=New&amp;p=2"'), 'forms post back to this page');
 });
+
+test('deleting a lead is a POST that returns to the same filtered page', async () => {
+  const lead = await models.Lead.findOne({ name: 'Bulk Lead 59' });
+  const r = await as(f.admin).post('/app?page=leads&status=New&p=2', { action: 'delete', table: 'leads', id: String(lead._id) });
+  assert.equal(r.msg, 'Deleted successfully.');
+  assert.match(r.location, /^\/app\?page=leads&status=New&p=2&msg=/);
+  assert.equal(await models.Lead.exists({ _id: lead._id }), null);
+});

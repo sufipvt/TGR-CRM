@@ -124,9 +124,7 @@
                     }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <% } %>
                   <% if (isManager) { %>
-                    <a class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"
-                       href="<%= leadsUrl %>&delete=1&table=leads&id=<%= lead._id %>"
-                       onclick="return confirm('Delete this lead?')"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                    <form method="POST" action="<%= leadsUrl %>" class="d-inline" onsubmit="return confirm('Delete this lead?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="leads"><input type="hidden" name="id" value="<%= lead._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete lead"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                   <% } %>
                 </td>
               </tr>

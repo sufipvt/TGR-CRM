@@ -39,8 +39,7 @@
                   _id: String(t._id), name: t.name,
                   team_leader_id: t.team_leader_id ? String(t.team_leader_id._id) : ""
                 }) %>)'><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit</button>
-              <a class="btn btn-sm btn-outline-danger" href="/app?page=teams&delete=1&table=teams&id=<%= t._id %>"
-                 onclick="return confirm('Delete this team? Members must be reassigned first.')" aria-label="Delete team"><i class="fa-solid fa-trash me-1" aria-hidden="true"></i>Delete</a>
+              <form method="POST" action="/app?page=teams" class="d-inline" onsubmit="return confirm('Delete this team? Members must be reassigned first.')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="teams"><input type="hidden" name="id" value="<%= t._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete team"><i class="fa-solid fa-trash me-1" aria-hidden="true"></i>Delete</button></form>
             </div>
           </div>
         </div>
