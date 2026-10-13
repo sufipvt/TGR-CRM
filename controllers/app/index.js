@@ -16,6 +16,7 @@ const {
 } = require('../../services/reports');
 const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { loadLeadPage, keepListQs } = require('../../services/leadList');
+const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -107,7 +108,8 @@ async function appHandler(req, res) {
       data.qualified_leads = await Lead.find({ ...leadFilter, status: { $in: ['Qualified', 'Site Visit Scheduled', 'Negotiation'] } }).select('name phone project_id');
     } else if (page === 'projects') {
       if (!isManager(user.role)) return res.redirect('/app?page=dashboard');
-      data.projects_detail = data.projects;
+      const counts = await unitCountsByProject();
+      data.projects_detail = data.projects.map(p => ({ ...p.toObject(), ...unitCountsFor(p, counts) }));
       data.units = await Unit.find().sort('unit_number');
     } else if (page === 'users') {
       data.users = await User.find().sort('full_name').select('-password').populate('team_id');
