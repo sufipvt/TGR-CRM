@@ -73,7 +73,7 @@ function as(user) {
     const res = await fetch(baseUrl + path, opts);
     const location = res.headers.get('location') || '';
     const msg = new URL(location || '/', baseUrl).searchParams.get('msg');
-    return { status: res.status, location, msg, text: () => res.text(), json: () => res.json() };
+    return { status: res.status, headers: res.headers, location, msg, text: () => res.text(), json: () => res.json() };
   };
   return {
     get: path => request('GET', path),
