@@ -56,6 +56,7 @@ The chatbot (`routes/chat.js`) must use the same filters, including for anything
 - Rate limiters are singletons in `middleware/rateLimits.js`; import them, never re-create.
 - `userContextCache` (middleware/auth.js) must be cleared when a user's role, team or status changes.
 - Write an `audit(...)` entry for every create, update and delete.
+- Anything that changes data is a POST form, never a GET link. Deletes post `action=delete, table, id`.
 - Form actions throw `Object.assign(new Error(msg), { status })`, and `controllers/app/index.js` turns that into a flash message.
 - Keep files under ~600 lines; split by responsibility when they grow (`public/app.js` is already over).
 - Dates: `config/env.js` sets `process.env.TZ` to `APP_TIMEZONE` (default Asia/Kolkata), so `new Date()`, `setHours` and `toLocale*` are business time. For datetime-local inputs use `toDateTimeInput()`, never `toISOString()` (that's UTC).

@@ -50,8 +50,7 @@
                       booking_date: b.booking_date ? new Date(b.booking_date).toISOString().slice(0,10) : "",
                       status: b.status, notes: b.notes || ""
                     }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
-                  <a class="btn btn-sm btn-outline-danger" href="/app?page=bookings&delete=1&table=bookings&id=<%= b._id %>"
-                     onclick="return confirm('Delete this booking? Unit will be released and lead returned to Negotiation.')" title="Delete" aria-label="Delete booking"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                  <form method="POST" action="/app?page=bookings" class="d-inline" onsubmit="return confirm('Delete this booking? Unit will be released and lead returned to Negotiation.')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="bookings"><input type="hidden" name="id" value="<%= b._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" title="Delete" aria-label="Delete booking"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                 </td>
               </tr>
             <% }) %>

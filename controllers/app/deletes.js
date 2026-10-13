@@ -1,4 +1,5 @@
-// /app deletes (?delete=1&table=...&id=...)
+// /app deletes: POST action=delete, table=..., id=... (never a GET link, so a
+// prefetch, crawler or pasted URL can't delete anything)
 const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team
 } = require('../../models');
@@ -11,7 +12,7 @@ const { canEditLead, canActForUser } = require('../../services/access');
 function forbidden() { return Object.assign(new Error('Forbidden'), { status: 403 }); }
 
 async function handleDelete(req) {
-  const { table, id } = req.query;
+  const { table, id } = req.body;
   // Every delete is by a single document id; anything else is refused before any write.
   if (typeof id !== 'string' || !isValidObjectId(id)) throw Object.assign(new Error('Invalid id'), { status: 400 });
   const user = req.user;

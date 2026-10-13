@@ -29,8 +29,7 @@
                       _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "",
                       role: u.role, status: u.status, team_id: u.team_id ? String(u.team_id._id) : ""
                     }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
-                  <a class="btn btn-sm btn-outline-danger" href="/app?page=users&delete=1&table=users&id=<%= u._id %>"
-                     onclick="return confirm('Delete this user?')" aria-label="Delete user"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                  <form method="POST" action="/app?page=users" class="d-inline" onsubmit="return confirm('Delete this user?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="users"><input type="hidden" name="id" value="<%= u._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete user"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                 </td>
               </tr>
             <% }) %>

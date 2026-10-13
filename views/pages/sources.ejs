@@ -17,8 +17,7 @@
                 <td class="text-nowrap">
                   <button class="btn btn-sm btn-outline-primary" aria-label="Edit source"
                     onclick='tgEditSource(<%= JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
-                  <a class="btn btn-sm btn-outline-danger" href="/app?page=sources&delete=1&table=sources&id=<%= s._id %>"
-                     onclick="return confirm('Delete this source?')" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></a>
+                  <form method="POST" action="/app?page=sources" class="d-inline" onsubmit="return confirm('Delete this source?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="sources"><input type="hidden" name="id" value="<%= s._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                 </td>
               </tr>
             <% }) %>
