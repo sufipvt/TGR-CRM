@@ -5,6 +5,8 @@ const { Unit, Lead, FollowUp, Booking, AuditLog } = require('../models');
 const { formatMoney } = require('../utils/format');
 const { audit } = require('../services/audit');
 const { canEditLead } = require('../services/access');
+const { findDuplicateLead } = require('../services/duplicates');
+const { objIdOrNull } = require('../utils/request');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { appActionLimiter } = require('../middleware/rateLimits');
 
@@ -38,6 +40,17 @@ router.get('/api/units/:projectId', requireAuth, appActionLimiter, refreshUserCo
     const units = await Unit.find({ project_id: req.params.projectId, status: 'Available' }).sort('unit_number');
     res.json(units);
   } catch (e) { res.status(500).json({ error: 'Failed to load units' }); }
+});
+
+// Does another lead already have this phone? Used by the lead form as you type.
+// Details only for a lead the user may see; otherwise just that one exists.
+router.get('/api/lead-phone-check', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
+  try {
+    const dup = await findDuplicateLead(String(req.query.phone || '').slice(0, 40), objIdOrNull(req.query.exclude));
+    if (!dup) return res.json({ duplicate: false });
+    if (!(await canEditLead(req.user, dup._id))) return res.json({ duplicate: true, visible: false });
+    res.json({ duplicate: true, visible: true, name: dup.name, status: dup.status, caller: dup.assigned_caller_id?.full_name || '' });
+  } catch (e) { res.status(500).json({ error: 'Check failed' }); }
 });
 
 router.get('/api/lead-timeline/:leadId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {

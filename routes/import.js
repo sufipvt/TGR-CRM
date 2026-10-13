@@ -5,6 +5,7 @@ const { Project, LeadSource, Lead } = require('../models');
 const { escapeRegex } = require('../utils/request');
 const { audit } = require('../services/audit');
 const { getNextCaller } = require('../services/assignment');
+const { phoneKey } = require('../services/duplicates');
 const { requireAuth, requireAdmin, refreshUserContext } = require('../middleware/auth');
 const { expensiveOpLimiter } = require('../middleware/rateLimits');
 const { upload } = require('../middleware/upload');
@@ -43,7 +44,13 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
         return (row[field] || '').trim();
       }
 
-      const results = { success: 0, failed: 0, errors: [] };
+      const results = { success: 0, failed: 0, duplicates: 0, errors: [] };
+
+      // Phones already in the CRM, plus each one added from this file, so a
+      // re-imported or repeated row is skipped instead of creating a second lead.
+      const knownPhones = new Set(
+        (await Lead.find().select('phone').lean()).map(l => phoneKey(l.phone)).filter(Boolean)
+      );
 
       for (const row of records) {
         try {
@@ -52,6 +59,12 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
           if (!name || !phone) {
             results.failed++;
             results.errors.push('Row missing name/phone');
+            continue;
+          }
+
+          const key = phoneKey(phone);
+          if (key && knownPhones.has(key)) {
+            results.duplicates++;
             continue;
           }
 
@@ -111,6 +124,7 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
             created_at: new Date()
           });
 
+          if (key) knownPhones.add(key);
           await audit(req.user.email, 'csv_import', 'Lead', lead._id, { name });
           results.success++;
         } catch (e) {
@@ -121,7 +135,8 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
 
       res.redirect('/app?page=leads&msg=' + encodeURIComponent(
         'Imported ' + results.success + ' leads. ' +
-        (results.failed ? results.failed + ' failed.' : 'All successful! ✓')
+        (results.duplicates ? results.duplicates + ' skipped: phone already in the CRM. ' : '') +
+        (results.failed ? results.failed + ' failed.' : (results.duplicates ? '' : 'All successful! ✓'))
       ));
     } catch (e) {
       console.error('CSV import error:', e);
