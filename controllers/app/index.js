@@ -17,6 +17,7 @@ const {
 const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
+const { captureSettings } = require('../../services/capture');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -125,6 +126,8 @@ async function appHandler(req, res) {
       data.all_agents = allUsers.filter(u => ['Team Leader', 'Sub Team Leader'].includes(u.role));
     } else if (page === 'settings') {
       data.settings = await getSettings();
+      data.capture = await captureSettings();
+      data.base_url = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/+$/, '');
       data.unfixed_followups = isSuperAdmin(user.role) ? await countUnfixedFollowUps() : 0;
     } else if (page === 'reports') {
       const { from, to, fromStr, toStr } = reportRange(req.query);
