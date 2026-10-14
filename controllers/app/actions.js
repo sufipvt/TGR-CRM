@@ -16,6 +16,7 @@ const { getNextCaller } = require('../../services/assignment');
 const { fixFollowUpTimes } = require('../../services/istFollowupFix');
 const { canEditLead, canActForUser, canAssignTo } = require('../../services/access');
 const { phoneKey, findDuplicateLead } = require('../../services/duplicates');
+const { captureSettings, setSetting, newWebhookKey } = require('../../services/capture');
 const { userContextCache } = require('../../middleware/auth');
 
 function forbidden(msg) { return Object.assign(new Error(msg || 'Forbidden'), { status: 403 }); }
@@ -404,6 +405,25 @@ async function handlePostAction(req) {
       clearSettingsCache();
       await audit(user.email, 'update', 'Settings', '', {});
       return 'Settings saved.';
+    }
+    case 'save_lead_capture': {
+      if (!isAdminRole(user.role)) throw forbidden();
+      const cfg = await captureSettings();
+      const source = objIdOrNull(body.capture_source_id);
+      await setSetting('capture_form_enabled', body.capture_form_enabled === '1' ? '1' : '');
+      await setSetting('capture_source_id', source ? String(source) : '');
+      await setSetting('capture_webhook_enabled', body.capture_webhook_enabled === '1' ? '1' : '');
+      if (body.capture_webhook_enabled === '1' && !cfg.webhookKey) await setSetting('capture_webhook_key', newWebhookKey());
+      await audit(user.email, 'update', 'Settings', 'lead_capture', {
+        form: body.capture_form_enabled === '1', webhook: body.capture_webhook_enabled === '1'
+      });
+      return 'Lead capture settings saved.';
+    }
+    case 'regenerate_capture_key': {
+      if (!isAdminRole(user.role)) throw forbidden();
+      await setSetting('capture_webhook_key', newWebhookKey());
+      await audit(user.email, 'update', 'Settings', 'lead_capture', { webhook_key: 'regenerated' });
+      return 'New webhook key created. Update it everywhere the old one was used.';
     }
     default:
       throw Object.assign(new Error('Unknown action'), { status: 400 });

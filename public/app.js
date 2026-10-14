@@ -259,6 +259,21 @@ document.addEventListener('DOMContentLoaded', () => {
   if (input) input.addEventListener('change', tgCheckLeadPhone);
 });
 
+// Copy an input's value (Settings: enquiry link, webhook URL and key).
+async function tgCopy(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  try {
+    await navigator.clipboard.writeText(el.value);
+    const label = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(() => { btn.textContent = label; }, 1500);
+  } catch (e) {
+    el.type = 'text';
+    el.select();
+  }
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

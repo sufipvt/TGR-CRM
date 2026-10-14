@@ -36,4 +36,22 @@ const appActionLimiter = rateLimit({
   message: 'Too many requests. Please slow down and try again shortly.'
 });
 
-module.exports = { loginLimiter, chatLimiter, expensiveOpLimiter, appActionLimiter };
+// Public enquiry form: real visitors send one or two, so a low ceiling per IP stops spam
+const enquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many enquiries from this connection. Please try again later.'
+});
+
+// Lead webhook: servers (Google Ads, Zapier) can post bursts, so a higher ceiling
+const webhookLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests' }
+});
+
+module.exports = { loginLimiter, chatLimiter, expensiveOpLimiter, appActionLimiter, enquiryLimiter, webhookLimiter };
