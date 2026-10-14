@@ -274,7 +274,14 @@
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="lf_phone">Phone *</label>
-                  <input class="form-control" id="lf_phone" name="phone" required>
+                  <input class="form-control" id="lf_phone" name="phone" required aria-describedby="lf_phone_dup">
+                  <div id="lf_phone_dup" class="form-text text-warning-emphasis" role="status" hidden>
+                    <span id="lf_phone_dup_text"></span>
+                    <div class="form-check mt-1">
+                      <input class="form-check-input" type="checkbox" name="allow_duplicate" value="1" id="lf_allow_dup">
+                      <label class="form-check-label" for="lf_allow_dup">Save anyway</label>
+                    </div>
+                  </div>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label" for="lf_email">Email</label>

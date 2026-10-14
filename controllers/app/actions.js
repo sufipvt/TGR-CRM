@@ -15,6 +15,7 @@ const { clearSettingsCache } = require('../../services/settings');
 const { getNextCaller } = require('../../services/assignment');
 const { fixFollowUpTimes } = require('../../services/istFollowupFix');
 const { canEditLead, canActForUser, canAssignTo } = require('../../services/access');
+const { phoneKey, findDuplicateLead } = require('../../services/duplicates');
 const { userContextCache } = require('../../middleware/auth');
 
 function forbidden(msg) { return Object.assign(new Error(msg || 'Forbidden'), { status: 403 }); }
@@ -26,6 +27,23 @@ async function assertAssignable(user, ...ids) {
   }
 }
 
+// Stop a second lead with the same phone unless the user ticked "Save anyway".
+// Only names the existing lead to someone allowed to see it. On edit, only a
+// changed phone is checked, so old duplicates don't block unrelated edits.
+async function assertNotDuplicate(user, body, leadId) {
+  if (body.allow_duplicate === '1') return;
+  if (leadId) {
+    const current = await Lead.findById(leadId).select('phone').lean();
+    if (current && phoneKey(current.phone) === phoneKey(body.phone)) return;
+  }
+  const dup = await findDuplicateLead(body.phone, leadId);
+  if (!dup) return;
+  const who = (await canEditLead(user, dup._id))
+    ? `${dup.name} (${dup.status}${dup.assigned_caller_id ? ', ' + dup.assigned_caller_id.full_name : ''})`
+    : 'a lead outside your team';
+  throw Object.assign(new Error(`This phone number already belongs to ${who}. Tick "Save anyway" to keep both.`), { status: 409 });
+}
+
 async function handlePostAction(req) {
   const body = cleanBody(req.body);
   const action = body.action;
@@ -35,6 +53,7 @@ async function handlePostAction(req) {
   switch (action) {
     case 'add_lead': {
       await assertAssignable(user, objIdOrNull(body.assigned_caller_id), objIdOrNull(body.assigned_closer_id));
+      await assertNotDuplicate(user, body);
       const caller = objIdOrNull(body.assigned_caller_id) || await getNextCaller();
       const lead = await Lead.create({
         name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
@@ -53,6 +72,7 @@ async function handlePostAction(req) {
     }
     case 'update_lead': {
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      await assertNotDuplicate(user, body, objIdOrNull(body.lead_id));
       const update = {
         name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
         budget_range: body.budget_range || '', notes: body.notes || ''

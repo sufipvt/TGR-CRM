@@ -164,6 +164,7 @@ function tgResetLeadForm() {
   const title = document.getElementById('leadModalTitle');
   if (title) title.textContent = 'Add Lead';
   tgToggleDispositionReason();
+  tgCheckLeadPhone();
 }
 
 function tgEditLead(lead) {
@@ -171,6 +172,7 @@ function tgEditLead(lead) {
   setVal('leadId', lead._id);
   setVal('lf_name', lead.name);
   setVal('lf_phone', lead.phone);
+  tgShowPhoneDuplicate(null);
   setVal('lf_email', lead.email);
   setVal('lf_city', lead.city);
   setVal('lf_source', lead.source_id);
@@ -221,6 +223,42 @@ async function tgShowTimeline(leadId, leadName) {
 }
 
 // Safe for both element text and quoted attribute values.
+/* ======================= DUPLICATE PHONE CHECK ====================== */
+// Warns under the phone field when another lead has the same number. The server
+// refuses the save unless "Save anyway" is ticked, so this is only a heads-up.
+function tgShowPhoneDuplicate(info) {
+  const box = document.getElementById('lf_phone_dup');
+  if (!box) return;
+  const allow = document.getElementById('lf_allow_dup');
+  if (allow) allow.checked = false;
+  box.hidden = !info;
+  if (!info) return;
+  document.getElementById('lf_phone_dup_text').textContent = info.visible
+    ? 'Already a lead: ' + info.name + ' (' + info.status + (info.caller ? ', ' + info.caller : '') + ').'
+    : 'This number is already a lead outside your team.';
+}
+
+let tgPhoneCheckSeq = 0;
+async function tgCheckLeadPhone() {
+  const input = document.getElementById('lf_phone');
+  if (!input) return;
+  const phone = input.value.trim();
+  const seq = ++tgPhoneCheckSeq;
+  if (phone.replace(/\D/g, '').length < 6) return tgShowPhoneDuplicate(null);
+  const exclude = document.getElementById('leadAction')?.value === 'update_lead' ? (document.getElementById('leadId')?.value || '') : '';
+  try {
+    const res = await fetch('/api/lead-phone-check?phone=' + encodeURIComponent(phone) + '&exclude=' + encodeURIComponent(exclude));
+    if (!res.ok || seq !== tgPhoneCheckSeq) return;
+    const data = await res.json();
+    tgShowPhoneDuplicate(data.duplicate ? data : null);
+  } catch (e) { /* the server still checks on save */ }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('lf_phone');
+  if (input) input.addEventListener('change', tgCheckLeadPhone);
+});
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
