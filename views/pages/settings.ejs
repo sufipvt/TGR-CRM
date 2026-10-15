@@ -33,6 +33,13 @@
             <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_form_url', this)">Copy</button>
             <% if (data.capture.formEnabled) { %><a class="btn btn-outline-primary" href="/enquire" target="_blank" rel="noopener">Open</a><% } %>
           </div>
+          <label class="form-label" for="cap_link_project">Link for one project</label>
+          <select class="form-select mb-1" id="cap_link_project" data-base="<%= formUrl %>"
+            onchange="document.getElementById('cap_form_url').value = this.dataset.base + (this.value ? '?project=' + this.value : '')">
+            <option value="">All projects (buyer picks)</option>
+            <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+          </select>
+          <p class="text-secondary mb-3" style="font-size:13px;">Picks that project on the form. To see which ad or post a lead came from, add <code>?utm_source=instagram&amp;utm_campaign=diwali</code> (or <code>&amp;utm_source=…</code> after a project link). The buyer's answers set the lead to Hot, Warm or Cold, and the assigned agent gets a first call on their follow-ups: Hot within 15 minutes, Warm within 2 hours, Cold the next morning.</p>
           <label class="form-label" for="cap_source">Mark these leads as source</label>
           <select class="form-select" id="cap_source" name="capture_source_id">
             <option value="">Website Enquiry (created automatically)</option>
