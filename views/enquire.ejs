@@ -14,6 +14,11 @@
     .btn-brand { background: #1a56db; color: #fff; font-weight: 600; padding: 12px; border-radius: 10px; border: none; }
     .btn-brand:hover { background: #1e429f; color: #fff; }
     .hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+    .eq-label { font-size: 14px; font-weight: 500; margin-bottom: 8px; display: block; }
+    .eq-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+    .eq-pills .btn { border-radius: 999px; font-size: 14px; padding: 8px 14px; }
+    .btn-check:checked + .btn-outline-primary { background: #1a56db; border-color: #1a56db; color: #fff; }
+    .eq-section { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; margin: 8px 0 12px; }
   </style>
 </head>
 <body>
@@ -22,9 +27,10 @@
     <% if (done) { %>
       <p class="mt-3 mb-0" role="status">Thank you. We've received your enquiry and our team will call you shortly.</p>
     <% } else { %>
-      <p class="text-secondary mb-4" style="font-size:14px;">Share your details and our team will call you back.</p>
+      <p class="text-secondary mb-4" style="font-size:14px;">Tell us what you're looking for and our team will call you back.</p>
       <% if (error) { %><div class="alert alert-danger py-2" style="font-size:14px;" role="alert"><%= error %></div><% } %>
       <form method="POST" action="/enquire">
+        <div class="eq-section">Your details</div>
         <div class="mb-3">
           <label for="eq_name" class="form-label fw-medium" style="font-size:14px;">Name *</label>
           <input class="form-control" id="eq_name" name="name" required maxlength="100" autocomplete="name" value="<%= values.name || '' %>">
@@ -33,23 +39,60 @@
           <label for="eq_phone" class="form-label fw-medium" style="font-size:14px;">Phone *</label>
           <input type="tel" class="form-control" id="eq_phone" name="phone" required maxlength="30" autocomplete="tel" value="<%= values.phone || '' %>">
         </div>
-        <div class="mb-3">
+        <div class="mb-4">
           <label for="eq_email" class="form-label fw-medium" style="font-size:14px;">Email</label>
           <input type="email" class="form-control" id="eq_email" name="email" maxlength="120" autocomplete="email" value="<%= values.email || '' %>">
         </div>
+
+        <div class="eq-section">What you're looking for</div>
+        <fieldset class="mb-3">
+          <legend class="eq-label">When are you planning to buy? *</legend>
+          <div class="eq-pills">
+            <% options.timelines.forEach((t, i) => { %>
+              <input type="radio" class="btn-check" name="timeline" id="eq_tl<%= i %>" value="<%= t %>" required <%= values.timeline === t ? 'checked' : '' %>>
+              <label class="btn btn-outline-primary" for="eq_tl<%= i %>"><%= t %></label>
+            <% }) %>
+          </div>
+        </fieldset>
         <% if (projects.length) { %>
           <div class="mb-3">
-            <label for="eq_project" class="form-label fw-medium" style="font-size:14px;">Interested in</label>
+            <label for="eq_project" class="form-label fw-medium" style="font-size:14px;">Project</label>
             <select class="form-select" id="eq_project" name="project_id">
               <option value="">Not sure yet</option>
               <% projects.forEach(p => { %><option value="<%= p._id %>" <%= String(values.project_id) === String(p._id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
             </select>
           </div>
         <% } %>
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <label for="eq_type" class="form-label fw-medium" style="font-size:14px;">Looking for</label>
+            <select class="form-select" id="eq_type" name="property_type">
+              <option value="">Any</option>
+              <% options.propertyTypes.forEach(t => { %><option value="<%= t %>" <%= values.property_type === t ? 'selected' : '' %>><%= t %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-sm-6">
+            <label for="eq_budget" class="form-label fw-medium" style="font-size:14px;">Budget</label>
+            <select class="form-select" id="eq_budget" name="budget">
+              <option value="">Prefer not to say</option>
+              <% options.budgets.forEach(b => { %><option value="<%= b %>" <%= values.budget === b ? 'selected' : '' %>><%= b %></option><% }) %>
+            </select>
+          </div>
+        </div>
+        <fieldset class="mb-3">
+          <legend class="eq-label">Would you like to visit the site?</legend>
+          <div class="eq-pills">
+            <% options.siteVisits.forEach((v, i) => { %>
+              <input type="radio" class="btn-check" name="site_visit" id="eq_sv<%= i %>" value="<%= v %>" <%= values.site_visit === v ? 'checked' : '' %>>
+              <label class="btn btn-outline-primary" for="eq_sv<%= i %>"><%= v %></label>
+            <% }) %>
+          </div>
+        </fieldset>
         <div class="mb-4">
-          <label for="eq_msg" class="form-label fw-medium" style="font-size:14px;">Message</label>
+          <label for="eq_msg" class="form-label fw-medium" style="font-size:14px;">Anything else?</label>
           <textarea class="form-control" id="eq_msg" name="message" rows="3" maxlength="1000"><%= values.message || '' %></textarea>
         </div>
+        <% ['utm_source', 'utm_medium', 'utm_campaign'].forEach(k => { if (values[k]) { %><input type="hidden" name="<%= k %>" value="<%= values[k] %>"><% } }) %>
         <div class="hp" aria-hidden="true"><label for="eq_website">Website</label><input id="eq_website" name="website" tabindex="-1" autocomplete="off"></div>
         <button type="submit" class="btn btn-brand w-100">Send enquiry</button>
       </form>

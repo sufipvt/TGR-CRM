@@ -24,7 +24,12 @@ const leadSchema = new Schema({
   // Where the lead sits in lists, newest first: when it arrived, or when it last enquired again.
   listed_at:          { type: Date, default: function () { return this.created_at || new Date(); } },
   last_enquiry_at:    Date,
-  enquiry_count:      { type: Number, default: 0 }
+  enquiry_count:      { type: Number, default: 0 },
+  // Answers from the enquiry form or webhook, kept as given (see services/enquiryScore.js)
+  enquiry: {
+    timeline: String, budget: String, property_type: String, site_visit: String,
+    utm_source: String, utm_medium: String, utm_campaign: String
+  }
 });
 
 // Leads from before listed_at existed have none; lists sort them after, by created_at.

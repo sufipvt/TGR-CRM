@@ -3,13 +3,14 @@
 // CRM never makes a second lead: the enquiry is noted on the existing one.
 const crypto = require('crypto');
 const { Types } = require('mongoose');
-const { Lead, LeadSource, Project, Setting } = require('../models');
+const { Lead, LeadSource, Project, Setting, FollowUp } = require('../models');
 const { escapeRegex } = require('../utils/request');
 const { audit } = require('./audit');
 const { getNextCaller } = require('./assignment');
 const { phoneKey, findDuplicateLead } = require('./duplicates');
 const { getSettings, clearSettingsCache } = require('./settings');
 const { notifyLeadCaptured } = require('./notify');
+const { readAnswers, scoreAnswers, hotter, firstCallDue, answersLine, DUE_WORDS } = require('./enquiryScore');
 
 const FORM_SOURCE = 'Website Enquiry';
 const WEBHOOK_SOURCE = 'Webhook';
@@ -58,6 +59,8 @@ async function findProject(projectId, projectName) {
 }
 
 // Saves one captured lead. `via` names the channel in notes and the audit log.
+// Buying answers (timeline, budget, property_type, site_visit, utm_*) are optional;
+// they set Hot / Warm / Cold and how soon the first call is due.
 // Throws { status: 400 } for missing name or phone.
 async function captureLead(input, via, defaults = {}) {
   const name = text(input.name, 100);
@@ -65,20 +68,29 @@ async function captureLead(input, via, defaults = {}) {
   if (!name || !phoneKey(phone)) throw Object.assign(new Error('Please give a name and a valid phone number.'), { status: 400 });
   const message = text(input.notes, 1000);
   const project = await findProject(input.project_id, input.project);
+  const answers = readAnswers(input);
+  const temperature = scoreAnswers(answers);
+  const summary = answersLine(answers);
 
   const dup = await findDuplicateLead(phone);
   if (dup) {
     const when = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    const line = `[${when}] Enquired again via ${via}` + (project ? ` about ${project.name}` : '') + (message ? `: ${message}` : '');
-    const current = await Lead.findById(dup._id).select('notes').lean();
+    const line = `[${when}] Enquired again via ${via}` + (project ? ` about ${project.name}` : '') +
+      (summary ? ` (${summary})` : '') + (message ? `: ${message}` : '');
+    const current = await Lead.findById(dup._id).select('notes temperature').lean();
     const now = new Date();
-    // Back to the top of the list, marked as re-enquired, so it isn't missed.
-    await Lead.updateOne({ _id: dup._id }, {
+    const update = {
       notes: [current && current.notes, line].filter(Boolean).join('\n'),
+      // Back to the top of the list, marked as re-enquired, so it isn't missed.
       listed_at: now, last_enquiry_at: now, $inc: { enquiry_count: 1 }
-    });
-    await audit(via, 'update', 'Lead', dup._id, { repeat_enquiry: true });
-    const fresh = await Lead.findById(dup._id).select('name phone assigned_caller_id assigned_closer_id').lean();
+    };
+    // A warmer answer this time warms the lead up; it never cools it down.
+    const was = current && current.temperature;
+    if (temperature && temperature !== was && hotter(temperature, was) === temperature) update.temperature = temperature;
+    await Lead.updateOne({ _id: dup._id }, update);
+    await audit(via, 'update', 'Lead', dup._id, { repeat_enquiry: true, ...(update.temperature ? { temperature } : {}) });
+    const fresh = await Lead.findById(dup._id).select('name phone temperature assigned_caller_id assigned_closer_id').lean();
+    await scheduleFirstCall(fresh, fresh.temperature, via, true);
     await alert(fresh, true, via);
     return { lead: dup, duplicate: true };
   }
@@ -89,17 +101,38 @@ async function captureLead(input, via, defaults = {}) {
     name, phone,
     email: text(input.email, 120),
     city: text(input.city, 60),
-    budget_range: text(input.budget, 60),
+    budget_range: answers.budget || text(input.budget, 60),
     source_id: source._id,
     project_id: project ? project._id : null,
     assigned_caller_id: caller,
     status: 'New',
-    notes: [`Captured via ${via}`, message].filter(Boolean).join(': '),
+    temperature: temperature || undefined,
+    enquiry: Object.fromEntries(Object.entries(answers).filter(([, v]) => v)),
+    notes: [`Captured via ${via}`, summary, message].filter(Boolean).join(': '),
     created_at: new Date()
   });
-  await audit(via, 'create', 'Lead', lead._id, { name, via });
+  await audit(via, 'create', 'Lead', lead._id, { name, via, ...(temperature ? { temperature } : {}) });
+  await scheduleFirstCall(lead, temperature, via, false);
   await alert(lead, false, via);
   return { lead, duplicate: false };
+}
+
+// Puts the first call on the assigned agent's follow-up list, due by how hot the lead is.
+// A repeat enquiry only adds one if nothing is already pending for that lead.
+async function scheduleFirstCall(lead, temperature, via, repeat) {
+  if (!lead.assigned_caller_id) return null;
+  if (repeat && await FollowUp.exists({ lead_id: lead._id, status: 'Pending' })) return null;
+  const label = temperature ? `${temperature} lead` : 'New lead';
+  const fu = await FollowUp.create({
+    lead_id: lead._id,
+    assigned_to_id: lead.assigned_caller_id,
+    scheduled_date: firstCallDue(temperature),
+    type: 'Call',
+    status: 'Pending',
+    notes: `${label} from ${via}${repeat ? ' (enquired again)' : ''}: call ${DUE_WORDS[temperature] || 'within the hour'}.`
+  });
+  await audit(via, 'create', 'FollowUp', fu._id, { lead_id: String(lead._id), first_call: true });
+  return fu;
 }
 
 // The lead is already saved; a failed alert must not turn the enquiry into an error.

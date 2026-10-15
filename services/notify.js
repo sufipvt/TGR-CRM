@@ -25,7 +25,8 @@ async function leadAudience(lead) {
 async function notifyLeadCaptured(lead, { duplicate, via }) {
   const userIds = await leadAudience(lead);
   if (!userIds.length) return 0;
-  const title = duplicate ? `${lead.name} enquired again` : `New lead: ${lead.name}`;
+  const hot = lead.temperature === 'Hot' ? 'hot ' : '';
+  const title = duplicate ? `${lead.name} enquired again` : `New ${hot}lead: ${lead.name}`;
   const body = `${lead.phone} · via ${via}`;
   const link = '/app?page=leads&q=' + encodeURIComponent(lead.phone);
   const kind = duplicate ? 'repeat_enquiry' : 'new_lead';

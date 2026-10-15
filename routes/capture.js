@@ -7,6 +7,7 @@ const { enquiryLimiter, webhookLimiter } = require('../middleware/rateLimits');
 const { logError } = require('../middleware/requestLog');
 const { sendErrorPage } = require('../utils/errorPage');
 const { captureSettings, captureLead, keyMatches, fromGoogleAds, WEBHOOK_SOURCE } = require('../services/capture');
+const { TIMELINES, BUDGETS, PROPERTY_TYPES, SITE_VISITS } = require('../services/enquiryScore');
 
 const router = express.Router();
 
@@ -14,11 +15,24 @@ const router = express.Router();
 const safe = fn => (req, res, next) => fn(req, res, next).catch(next);
 
 const openProjects = () => Project.find({ status: { $ne: 'Sold Out' } }).sort('name').select('name').lean();
+const options = { timelines: TIMELINES, budgets: BUDGETS, propertyTypes: PROPERTY_TYPES, siteVisits: SITE_VISITS };
+const FORM_FIELDS = ['timeline', 'budget', 'property_type', 'site_visit', 'utm_source', 'utm_medium', 'utm_campaign'];
+const str = v => (typeof v === 'string' ? v : '');
+
+// ?project=<id> preselects a project (one link per project page or ad);
+// ?utm_source=&utm_medium=&utm_campaign= record which ad or post sent the visitor.
+function linkValues(query) {
+  const values = { project_id: str(query.project) };
+  for (const k of ['utm_source', 'utm_medium', 'utm_campaign']) values[k] = str(query[k]).slice(0, 60);
+  return values;
+}
+
+const render = (res, extra) => res.render('enquire', { projects: [], values: {}, error: null, done: false, options, ...extra });
 
 router.get('/enquire', safe(async (req, res) => {
   const cfg = await captureSettings();
   if (!cfg.formEnabled) return sendErrorPage(res, 404, 'The page you’re looking for doesn’t exist.');
-  res.render('enquire', { projects: await openProjects(), values: {}, error: null, done: false });
+  render(res, { projects: await openProjects(), values: linkValues(req.query) });
 }));
 
 router.post('/enquire', enquiryLimiter, safe(async (req, res) => {
@@ -26,17 +40,17 @@ router.post('/enquire', enquiryLimiter, safe(async (req, res) => {
   if (!cfg.formEnabled) return sendErrorPage(res, 404, 'The page you’re looking for doesn’t exist.');
   const body = req.body || {};
   // Hidden field people never see; bots that fill every box get a fake "thanks".
-  if (body.website) return res.render('enquire', { projects: [], values: {}, error: null, done: true });
+  if (body.website) return render(res, { done: true });
+  const input = { name: body.name, phone: body.phone, email: body.email, project_id: body.project_id, notes: body.message };
+  for (const k of FORM_FIELDS) input[k] = body[k];
   try {
-    await captureLead(
-      { name: body.name, phone: body.phone, email: body.email, project_id: body.project_id, notes: body.message },
-      'enquiry form', { sourceId: cfg.formSourceId }
-    );
-    res.render('enquire', { projects: [], values: {}, error: null, done: true });
+    await captureLead(input, 'enquiry form', { sourceId: cfg.formSourceId });
+    render(res, { done: true });
   } catch (e) {
     if (!e.status) logError(req, 'enquire', e);
-    res.status(e.status || 500).render('enquire', {
-      projects: await openProjects(), values: body, done: false,
+    res.status(e.status || 500);
+    render(res, {
+      projects: await openProjects(), values: body,
       error: e.status ? e.message : 'Something went wrong. Please try again.'
     });
   }
