@@ -21,7 +21,9 @@ router.patch('/api/lead/:id/status', requireAuth, appActionLimiter, refreshUserC
     if (!(await canEditLead(req.user, req.params.id)))
       return res.status(403).json({ error: 'Forbidden' });
     const update = { status };
-    const existing = await Lead.findById(req.params.id).select('qualified_at booked_at');
+    const existing = await Lead.findById(req.params.id).select('status qualified_at booked_at');
+    if (status === 'Booked' && existing?.status !== 'Booked')
+      return res.status(400).json({ error: 'To mark a lead Booked, add a booking for it on the Bookings page.' });
     if (status === 'Qualified' && !existing?.qualified_at) update.qualified_at = new Date();
     if (status === 'Booked'    && !existing?.booked_at)    update.booked_at    = new Date();
     await Lead.findByIdAndUpdate(req.params.id, update);

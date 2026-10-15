@@ -43,6 +43,7 @@ async function visibleBookingFilter(user) {
   return { closer_id: new Types.ObjectId(user.userId) };
 }
 async function canEditLead(user, leadId) {
+  if (!Types.ObjectId.isValid(String(leadId || ''))) return false;
   if (isAdminRole(user.role)) return true;
   const lead = await Lead.findById(leadId).select('assigned_caller_id assigned_closer_id');
   if (!lead) return false;

@@ -37,6 +37,7 @@ async function handleDelete(req) {
     }
     case 'units': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      if (await Booking.exists({ unit_id: id })) throw Object.assign(new Error('Cannot delete: this unit has a booking'), { status: 400 });
       await Unit.findByIdAndDelete(id);
       await audit(user.email, 'delete', 'Unit', id, {});
       break;

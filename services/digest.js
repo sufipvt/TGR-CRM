@@ -2,6 +2,7 @@
 const sgMail = require('@sendgrid/mail');
 const { User, FollowUp, Lead, Setting } = require('../models');
 const { APP_NAME } = require('./settings');
+const { visibleLeadFilter } = require('./access');
 
 if (process.env.SENDGRID_API_KEY) {
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -82,7 +83,7 @@ async function sendDailyDigest() {
       const overdue = fus.filter(f => f.scheduled_date < startOfToday);
       const today = fus.filter(f => f.scheduled_date >= startOfToday && f.scheduled_date <= endOfToday);
       const upcoming = fus.filter(f => f.scheduled_date > endOfToday);
-      teamStats.push({ name: u.full_name, role: u.role, overdue: overdue.length, today: today.length, upcoming: upcoming.length });
+      teamStats.push({ id: String(u._id), team: String(u.team_id || ''), name: u.full_name, role: u.role, overdue: overdue.length, today: today.length, upcoming: upcoming.length });
       if (overdue.length + today.length === 0) { skipped++; continue; }
 
       const kpis = digestKpiBox('Overdue', overdue.length, overdue.length > 0 ? '#dc2626' : '#6b7280') +
@@ -104,14 +105,18 @@ async function sendDailyDigest() {
       } catch (e) { console.error('Digest send failed for ' + u.email + ':', e.message); }
     }
 
-    // MD/Admin summary
-    const newToday = await Lead.countDocuments({ created_at: { $gte: startOfToday } });
-    const totalOverdue = teamStats.reduce((s, t) => s + t.overdue, 0);
+    // Summary for admins (whole company) and Team Leaders (their own team only)
     for (const m of users.filter(x => ['Super Admin', 'Admin', 'Team Leader'].includes(x.role))) {
+      const isLeader = m.role === 'Team Leader';
+      if (isLeader && !m.team_id) continue;
+      const stats = isLeader ? teamStats.filter(t => t.team === String(m.team_id)) : teamStats;
+      const scope = await visibleLeadFilter({ role: m.role, team_id: m.team_id, userId: String(m._id) });
+      const newToday = await Lead.countDocuments({ ...scope, created_at: { $gte: startOfToday } });
+      const totalOverdue = stats.reduce((s, t) => s + t.overdue, 0);
       const kpis = digestKpiBox('Team Overdue', totalOverdue, totalOverdue > 0 ? '#dc2626' : '#6b7280') +
         digestKpiBox('New Leads Today', newToday, '#1a56db') +
-        digestKpiBox('Active Agents', teamStats.length, '#059669');
-      const rows = teamStats.map(t =>
+        digestKpiBox('Active Agents', stats.length, '#059669');
+      const rows = stats.map(t =>
         '<tr><td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;">' + esc(t.name) + ' <span style="color:#6b7280;">(' + esc(t.role) + ')</span></td>' +
         '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;color:' + (t.overdue > 0 ? '#dc2626' : '#111827') + ';">' + t.overdue + '</td>' +
         '<td style="padding:8px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">' + t.today + '</td>' +
@@ -125,8 +130,8 @@ async function sendDailyDigest() {
         await sgMail.send({
           to: m.email,
           from: process.env.SENDGRID_FROM,
-          subject: 'MD Summary \u2014 ' + dateStr + ' \u2014 ' + newToday + ' new leads, ' + totalOverdue + ' overdue',
-          html: digestHtml('MD Team Summary', dateStr, kpis, sections)
+          subject: (isLeader ? 'Team Summary' : 'MD Summary') + ' \u2014 ' + dateStr + ' \u2014 ' + newToday + ' new leads, ' + totalOverdue + ' overdue',
+          html: digestHtml(isLeader ? 'Team Summary' : 'MD Team Summary', dateStr, kpis, sections)
         });
         sent++;
       } catch (e) { console.error('MD digest send failed for ' + m.email + ':', e.message); }

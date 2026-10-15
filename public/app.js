@@ -921,7 +921,7 @@ function tgKanbanDrop(event, colEl, newStatus) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status: newStatus })
   }).then(r => r.json()).then(d => {
-    if (!d.ok) location.reload();
+    if (!d.ok) { if (d.error) alert(d.error); location.reload(); }
   }).catch(() => location.reload());
 }
 

@@ -55,6 +55,10 @@ function withRoutingTeam(user, body, fields) {
   return fields;
 }
 
+// A lead becomes Booked only through Add Booking, which also claims the unit and
+// records the sale; setting the status by hand would count a sale that isn't there.
+const notBookedByHand = () => Object.assign(new Error('To mark a lead Booked, add a booking for it on the Bookings page.'), { status: 400 });
+
 async function handlePostAction(req) {
   const body = cleanBody(req.body);
   const action = body.action;
@@ -112,8 +116,9 @@ async function handlePostAction(req) {
         update.temperature = null;
       }
       if (body.status && LEAD_STATUSES.includes(body.status)) {
+        const existing = await Lead.findById(body.lead_id).select('status qualified_at booked_at');
+        if (body.status === 'Booked' && existing.status !== 'Booked') throw notBookedByHand();
         update.status = body.status;
-        const existing = await Lead.findById(body.lead_id).select('qualified_at booked_at');
         if (body.status === 'Qualified' && !existing.qualified_at) update.qualified_at = new Date();
         if (body.status === 'Booked' && !existing.booked_at) update.booked_at = new Date();
         if (body.status === 'Not Interested' && NOT_INTERESTED_REASONS.includes(body.disposition_reason)) {
@@ -240,11 +245,16 @@ async function handlePostAction(req) {
     }
     case 'update_unit': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
+      // A unit someone has booked stays Booked or Sold until that booking is cancelled
+      // or deleted; making it Available would let it be booked a second time.
+      if (!['Booked', 'Sold'].includes(body.status) && await Booking.exists({ unit_id: objIdOrNull(body.unit_id), status: { $ne: 'Cancelled' } })) {
+        throw Object.assign(new Error('This unit has a booking. Cancel or delete the booking first.'), { status: 400 });
+      }
       await Unit.findByIdAndUpdate(body.unit_id, {
         unit_number: body.unit_number, type: body.type, bhk: body.bhk,
         area_sqft: Number(body.area_sqft || 0), base_price: Number(body.base_price || 0),
         status: body.status, notes: body.notes
-      });
+      }, { runValidators: true });
       await audit(user.email, 'update', 'Unit', body.unit_id, { unit_number: body.unit_number });
       return 'Unit updated.';
     }
@@ -279,8 +289,15 @@ async function handlePostAction(req) {
         role: body.role, phone: body.phone, status: body.status,
         team_id: objIdOrNull(body.team_id)
       };
+      const before = await User.findById(body.user_id).select('status').lean();
       if (body.password) update.password = await bcrypt.hash(body.password, 12);
-      await User.findByIdAndUpdate(body.user_id, update);
+      // A new password or deactivation signs the person out everywhere.
+      const signOut = body.password || (before && before.status === 'Active' && update.status !== 'Active');
+      await User.findByIdAndUpdate(body.user_id, signOut ? { ...update, $inc: { token_version: 1 } } : update);
+      // Someone no longer a Team Leader of a team stops being listed as its leader.
+      await Team.updateMany(
+        update.role === 'Team Leader' && update.team_id ? { team_leader_id: body.user_id, _id: { $ne: update.team_id } } : { team_leader_id: body.user_id },
+        { team_leader_id: null });
       userContextCache.delete(String(body.user_id));
       await audit(user.email, 'update', 'User', body.user_id, { email: body.email });
       return 'User updated.';
@@ -403,6 +420,7 @@ async function handlePostAction(req) {
       // If a Team Leader is assigned, update their role + team_id
       if (body.team_leader_id) {
         await User.findByIdAndUpdate(body.team_leader_id, { role: 'Team Leader', team_id: t._id });
+        await Team.updateMany({ team_leader_id: t.team_leader_id, _id: { $ne: t._id } }, { team_leader_id: null });
         userContextCache.delete(String(body.team_leader_id));
       }
       await audit(user.email, 'create', 'Team', t._id, { name: body.name });
@@ -421,6 +439,9 @@ async function handlePostAction(req) {
       // Promote new leader
       if (newLeaderId) {
         await User.findByIdAndUpdate(newLeaderId, { role: 'Team Leader', team_id: body.team_id });
+        // A person leads one team: stop listing them as leader of the team they had before,
+        // or that team's lead alerts keep going to them.
+        await Team.updateMany({ team_leader_id: newLeaderId, _id: { $ne: body.team_id } }, { team_leader_id: null });
         userContextCache.delete(String(newLeaderId));
       }
 
@@ -429,19 +450,9 @@ async function handlePostAction(req) {
       return 'Team updated.';
     }
     case 'assign_team_member': {
-      if (!isSuperAdmin(user.role) && !isTeamLeader(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      if (isTeamLeader(user.role)) {
-        // A Team Leader may only add unassigned agents to their own team, or
-        // release their own members. They can't pull people from other teams.
-        const target = await User.findById(objIdOrNull(body.user_id)).select('team_id role');
-        if (!target || isAdminRole(target.role)) throw forbidden();
-        const ownTeam = String(user.team_id || '');
-        const newTeam = String(objIdOrNull(body.team_id) || '');
-        const currentTeam = String(target.team_id || '');
-        if (!ownTeam || (newTeam && newTeam !== ownTeam) || (currentTeam && currentTeam !== ownTeam)) {
-          throw forbidden('You can only manage members of your own team');
-        }
-      }
+      // Only the Super Admin manages teams. A Team Leader taking in an unassigned
+      // agent would also take every lead that agent still owns.
+      if (!isSuperAdmin(user.role)) throw forbidden();
       await User.findByIdAndUpdate(body.user_id, { team_id: objIdOrNull(body.team_id) });
       userContextCache.delete(String(body.user_id));
       await audit(user.email, 'update', 'User', body.user_id, { team_assigned: body.team_id });
