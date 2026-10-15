@@ -529,3 +529,14 @@ body {
 .tg-bell-item.unread { border-left: 3px solid #2563eb; }
 .tg-bell-title { font-size: 14px; font-weight: 500; }
 .tg-bell-meta { font-size: 12px; color: var(--bs-secondary-color); }
+
+/* ===== DASHBOARD: clickable KPIs and the Today panel ===== */
+a.tg-kpi-link { display: block; color: #fff; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; }
+a.tg-kpi-link:hover { color: #fff; transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,22,35,0.18); }
+.tg-today-tabs { gap: 6px; scrollbar-width: none; }
+.tg-today-tabs .nav-link { font-size: 14px; padding: 6px 12px; }
+.tg-today-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bs-border-color); }
+.tg-today-row:last-of-type { border-bottom: 0; }
+@media (max-width: 575.98px) {
+  .tg-today-row { flex-wrap: wrap; }
+}

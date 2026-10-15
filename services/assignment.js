@@ -35,4 +35,4 @@ async function getNextCaller(lead = {}) {
   return callers.sort((a, b) => countMap[String(a._id)] - countMap[String(b._id)])[0]._id;
 }
 
-module.exports = { getNextCaller, teamFor };
+module.exports = { getNextCaller, teamFor, CLOSED_STATUSES };

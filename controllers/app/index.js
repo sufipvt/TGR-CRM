@@ -19,6 +19,7 @@ const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { captureSettings } = require('../../services/capture');
 const { notificationSummary } = require('../../services/notify');
+const { loadToday } = require('../../services/dashboard');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -75,6 +76,7 @@ async function appHandler(req, res) {
       ]);
       data.total_revenue = rev.length ? rev[0].total : 0;
       data.new_today = await Lead.countDocuments({ ...leadFilter, created_at: { $gte: startOfToday } });
+      data.today = await loadToday({ leadFilter, fuFilter });
       data.recent_leads = await Lead.find(leadFilter).sort({ listed_at: -1, created_at: -1 }).limit(8).populate('project_id source_id assigned_caller_id');
       data.booking_trend = await Booking.aggregate([
         ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),

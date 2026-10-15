@@ -44,9 +44,9 @@
             </button>
           </div>
           <% if (isManager) { %>
-            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal"><i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import CSV</button>
+            <button data-quick="import" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal"><i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import CSV</button>
           <% } %>
-          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal" onclick="tgResetLeadForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Lead</button>
+          <button data-quick="new" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal" onclick="tgResetLeadForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Lead</button>
         </div>
       </div>
 
