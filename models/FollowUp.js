@@ -18,5 +18,8 @@ const followUpSchema = new Schema({
 
 // Pending / overdue / today lists filter by assignee + status and sort by date
 followUpSchema.index({ assigned_to_id: 1, status: 1, scheduled_date: 1 });
+// Admins see everyone's: pending and overdue counts, and today's site visits
+followUpSchema.index({ status: 1, scheduled_date: 1 });
+followUpSchema.index({ type: 1, scheduled_date: 1 });
 
 module.exports = mongoose.model('FollowUp', followUpSchema);

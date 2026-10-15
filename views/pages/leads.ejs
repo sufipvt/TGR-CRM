@@ -142,7 +142,7 @@
                       temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
                       assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
                       assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
-                      notes: lead.notes || ""
+                      notes: lead.notes || "", updated_at: lead.updated_at ? String(new Date(lead.updated_at).getTime()) : ""
                     }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <% } %>
                   <% if (isManager) { %>
@@ -235,7 +235,7 @@
                             temperature: lead.temperature || "", disposition_reason: lead.disposition_reason || "",
                             assigned_caller_id: lead.assigned_caller_id ? String(lead.assigned_caller_id._id) : "",
                             assigned_closer_id: lead.assigned_closer_id ? String(lead.assigned_closer_id._id) : "",
-                            notes: lead.notes || ""
+                            notes: lead.notes || "", updated_at: lead.updated_at ? String(new Date(lead.updated_at).getTime()) : ""
                           }) %>)'>
                           <i class="fa-solid fa-pen" style="font-size:10px;" aria-hidden="true"></i>
                         </button>
@@ -289,6 +289,7 @@
             <div class="modal-body">
               <input type="hidden" name="action" value="add_lead" id="leadAction">
               <input type="hidden" name="lead_id" id="leadId">
+              <input type="hidden" name="updated_at" id="leadVersion">
               <div class="row g-3">
                 <div class="col-md-6">
                   <label class="form-label" for="lf_name">Name *</label>
