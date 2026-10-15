@@ -12,5 +12,8 @@ module.exports = mongoose.model('User', new Schema({
   team_id:   { type: Schema.Types.ObjectId, ref: 'Team', index: true },
   phone:     String,
   status:    { type: String, enum: ['Active', 'Inactive'], default: 'Active' },
+  // Goes up when the password is reset or the account is deactivated; sessions
+  // signed with an older number stop working (middleware/auth.js).
+  token_version: { type: Number, default: 0 },
   created_at:{ type: Date, default: Date.now }
 }));

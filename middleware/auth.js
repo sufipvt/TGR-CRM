@@ -35,7 +35,7 @@ async function refreshUserContext(req, res, next) {
     const now = Date.now();
 
     if (cached && cached.expires > now) {
-      if (cached.data === null) {
+      if (cached.data === null || cached.tv !== (req.user.tv || 0)) {
         res.clearCookie('tg_token');
         return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
       }
@@ -43,15 +43,15 @@ async function refreshUserContext(req, res, next) {
       return next();
     }
 
-    const dbUser = await User.findById(uid).select('role team_id status full_name');
-    if (!dbUser || dbUser.status !== 'Active') {
+    const dbUser = await User.findById(uid).select('role team_id status full_name token_version');
+    if (!dbUser || dbUser.status !== 'Active' || (dbUser.token_version || 0) !== (req.user.tv || 0)) {
       userContextCache.set(uid, { data: null, expires: now + USER_CACHE_TTL });
       res.clearCookie('tg_token');
       return res.redirect('/login?error=' + encodeURIComponent('Your session has ended. Please sign in again.'));
     }
 
     const fresh = { role: dbUser.role, team_id: dbUser.team_id, name: dbUser.full_name };
-    userContextCache.set(uid, { data: fresh, expires: now + USER_CACHE_TTL });
+    userContextCache.set(uid, { data: fresh, tv: dbUser.token_version || 0, expires: now + USER_CACHE_TTL });
     Object.assign(req.user, fresh);
     next();
   } catch (e) {

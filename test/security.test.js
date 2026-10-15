@@ -48,13 +48,16 @@ test('Team Leader cannot complete another team\'s follow-up', async () => {
   assert.equal((await models.FollowUp.findById(f.fuB._id)).status, 'Pending');
 });
 
-test('Team Leader cannot pull an agent out of another team', async () => {
+test('Team Leader cannot move agents between teams; only the Super Admin can', async () => {
   const tl = as(f.tlA);
   const r = await tl.post('/app?page=teams', { action: 'assign_team_member', user_id: String(f.subB._id), team_id: String(f.teamA._id) });
-  assert.match(r.msg, /own team/);
+  assert.match(r.msg, /^Error: Forbidden/);
   assert.equal(String((await models.User.findById(f.subB._id)).team_id), String(f.teamB._id));
 
-  const ok = await tl.post('/app?page=teams', { action: 'assign_team_member', user_id: String(f.loose._id), team_id: String(f.teamA._id) });
+  const unassigned = await tl.post('/app?page=teams', { action: 'assign_team_member', user_id: String(f.loose._id), team_id: String(f.teamA._id) });
+  assert.match(unassigned.msg, /^Error: Forbidden/, 'not even an unassigned agent, who may still own leads');
+
+  const ok = await as(f.superAdmin).post('/app?page=teams', { action: 'assign_team_member', user_id: String(f.loose._id), team_id: String(f.teamA._id) });
   assert.equal(ok.msg, 'Team member assigned.');
 });
 
