@@ -12,7 +12,7 @@ const {
   visibleLeadFilter, visibleFollowUpFilter, visibleBookingFilter
 } = require('../../services/access');
 const {
-  reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope
+  reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope, siteVisitReport
 } = require('../../services/reports');
 const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { loadLeadPage, keepListQs } = require('../../services/leadList');
@@ -179,6 +179,8 @@ async function appHandler(req, res) {
         completed: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Completed', completed_date: { $gte: from, $lte: to } }),
         missed: await FollowUp.countDocuments({ ...fuScopeFilter, status: 'Missed' })
       };
+
+      data.site_visit_report = await siteVisitReport(fuScopeFilter, from, to);
 
       data.source_performance = await Lead.aggregate([
         { $match: rangeFilter },

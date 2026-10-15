@@ -124,8 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (confirmCompleteBtn) {
     confirmCompleteBtn.addEventListener('click', () => {
       const outcome = document.getElementById('completeOutcomeInput').value;
+      const visit = document.getElementById('completeVisitOutcome');
+      if (_completeFuType === 'Site Visit' && !visit.value) { visit.classList.add('is-invalid'); visit.focus(); return; }
       setVal('completeFuId', _completeFuId);
       setVal('completeFuOutcome', outcome);
+      setVal('completeFuVisit', _completeFuType === 'Site Visit' ? visit.value : '');
       bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
       document.getElementById('completeFuForm').submit();
     });
@@ -356,9 +359,15 @@ function tgEditFollowup(f) {
 
 
 
-function tgCompleteFollowup(id) {
+let _completeFuType = '';
+function tgCompleteFollowup(id, type) {
   _completeFuId = id;
+  _completeFuType = type || '';
   document.getElementById('completeOutcomeInput').value = '';
+  const visit = document.getElementById('completeVisitOutcome');
+  visit.value = '';
+  visit.classList.remove('is-invalid');
+  document.getElementById('completeVisitWrap').hidden = _completeFuType !== 'Site Visit';
   new bootstrap.Modal(document.getElementById('completeModal')).show();
 }
 
@@ -1040,15 +1049,4 @@ document.addEventListener('DOMContentLoaded', () => {
     history.forEach(msg => tgAppendMsg(msg.text, msg.type, false));
   } catch(e) {}
 
-  // Complete follow-up modal confirm button
-  const confirmCompleteBtn = document.getElementById('confirmCompleteBtn');
-  if (confirmCompleteBtn) {
-    confirmCompleteBtn.addEventListener('click', () => {
-      const outcome = document.getElementById('completeOutcomeInput').value;
-      setVal('completeFuId', _completeFuId);
-      setVal('completeFuOutcome', outcome);
-      bootstrap.Modal.getInstance(document.getElementById('completeModal')).hide();
-      document.getElementById('completeFuForm').submit();
-    });
-  }
 });

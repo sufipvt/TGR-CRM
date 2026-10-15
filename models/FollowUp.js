@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { SITE_VISIT_OUTCOMES } = require('../config/constants');
 
 const { Schema } = mongoose;
 
@@ -10,6 +11,7 @@ const followUpSchema = new Schema({
   type:           { type: String, enum: ['Call', 'WhatsApp', 'Site Visit', 'Meeting', 'Email', 'Other'], default: 'Call' },
   status:         { type: String, enum: ['Pending', 'Completed', 'Missed', 'Cancelled'], default: 'Pending' },
   outcome:        String,
+  visit_outcome:  { type: String, enum: SITE_VISIT_OUTCOMES },
   notes:          String,
   created_at:     { type: Date, default: Date.now }
 });

@@ -19,7 +19,7 @@ test('a Sub Team Leader sees only their own calls and new leads, with call butto
   assert.ok(!html.includes('Bina Rao'), 'other team hidden');
   assert.ok(html.includes('href="tel:+919000000001"'));
   assert.ok(html.includes('https://wa.me/919000000001?text='));
-  assert.ok(html.includes(`onclick="tgCompleteFollowup('${f.fuA._id}')"`));
+  assert.ok(html.includes(`onclick='tgCompleteFollowup(&#34;${f.fuA._id}&#34;, &#34;Call&#34;)'`));
 });
 
 test('an admin sees everyone, with who owns each call', async () => {

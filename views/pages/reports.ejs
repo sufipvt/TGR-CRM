@@ -111,6 +111,46 @@
       </div>
     </div>
 
+    <% const SV = data.site_visit_report; %>
+    <div class="tg-panel mb-3" id="siteVisitReport">
+      <h2 class="tg-panel-title">Site Visits</h2>
+      <div class="row g-3 mb-3">
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= SV.total.scheduled %></div><div class="tg-mini-label">Scheduled (range)</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= SV.total.done %></div><div class="tg-mini-label">Done · <%= SV.total.show_rate %>% showed up</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi <%= SV.total.no_show > 0 ? 'tg-mini-danger' : '' %>"><div class="tg-mini-value"><%= SV.total.no_show %></div><div class="tg-mini-label">No-shows</div></div></div>
+        <div class="col-6 col-md-3"><div class="tg-mini-kpi"><div class="tg-mini-value"><%= SV.total.booked %></div><div class="tg-mini-label">Booked after a visit · <%= SV.total.booking_rate %>%</div></div></div>
+      </div>
+      <% if (Object.keys(SV.outcomes).length) { %>
+        <div class="d-flex flex-wrap gap-2 mb-3" style="font-size:13px;">
+          <% Object.entries(SV.outcomes).sort((a, b) => b[1] - a[1]).forEach(([o, n]) => { %>
+            <span class="badge text-bg-light border"><%= o %>: <%= n %></span>
+          <% }) %>
+        </div>
+      <% } %>
+      <% if (!SV.agents.length) { %>
+        <p class="text-secondary mb-0" style="font-size:14px;">No site visits scheduled in this range.</p>
+      <% } else { %>
+        <div class="table-responsive">
+          <table class="table tg-table mb-0">
+            <thead><tr><th>Agent</th><th>Scheduled</th><th>Done</th><th>No-show</th><th>Still pending</th><th>Interested</th><th>Booked after</th></tr></thead>
+            <tbody>
+              <% SV.agents.forEach(a => { %>
+                <tr>
+                  <td class="fw-medium"><%= a.name %></td>
+                  <td><%= a.scheduled %></td>
+                  <td><%= a.done %></td>
+                  <td><%= a.no_show %></td>
+                  <td><%= a.pending %></td>
+                  <td><%= a.interested %></td>
+                  <td><%= a.booked %></td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
     <div class="tg-panel mb-3">
       <h2 class="tg-panel-title">Team Performance</h2>
       <div class="table-responsive">

@@ -29,11 +29,11 @@
                     <td><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
                     <td style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
                     <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
-                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.outcome || '—' %></td>
+                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><% if (f.visit_outcome) { %><span class="badge text-bg-<%= f.visit_outcome === 'Interested' ? 'success' : (f.visit_outcome === 'No show' || f.visit_outcome === 'Not interested' ? 'danger' : 'secondary') %> me-1"><%= f.visit_outcome %></span><% } %><%= f.outcome || (f.visit_outcome ? '' : '—') %></td>
                     <td><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
                     <td class="text-nowrap">
                       <% if (f.status === 'Pending') { %>
-                        <button class="btn btn-sm btn-outline-success" title="Mark done" onclick="tgCompleteFollowup('<%= f._id %>')">Done</button>
+                        <button class="btn btn-sm btn-outline-success" title="Mark done" onclick='tgCompleteFollowup(<%= JSON.stringify(String(f._id)) %>, <%= JSON.stringify(f.type) %>)'>Done</button>
                       <% } %>
                       <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit follow-up"
                         onclick='tgEditFollowup(<%= JSON.stringify({
@@ -58,6 +58,7 @@
       <input type="hidden" name="action" value="complete_followup">
       <input type="hidden" name="followup_id" id="completeFuId">
       <input type="hidden" name="outcome" id="completeFuOutcome">
+      <input type="hidden" name="visit_outcome" id="completeFuVisit">
     </form>
 
     <!-- Schedule/Edit Follow-Up Modal -->
