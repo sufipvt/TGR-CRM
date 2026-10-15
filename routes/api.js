@@ -6,6 +6,7 @@ const { formatMoney } = require('../utils/format');
 const { audit } = require('../services/audit');
 const { canEditLead } = require('../services/access');
 const { findDuplicateLead } = require('../services/duplicates');
+const { notificationSummary, markAllRead } = require('../services/notify');
 const { objIdOrNull } = require('../utils/request');
 const { requireAuth, refreshUserContext } = require('../middleware/auth');
 const { appActionLimiter } = require('../middleware/rateLimits');
@@ -51,6 +52,19 @@ router.get('/api/lead-phone-check', requireAuth, appActionLimiter, refreshUserCo
     if (!(await canEditLead(req.user, dup._id))) return res.json({ duplicate: true, visible: false });
     res.json({ duplicate: true, visible: true, name: dup.name, status: dup.status, caller: dup.assigned_caller_id?.full_name || '' });
   } catch (e) { res.status(500).json({ error: 'Check failed' }); }
+});
+
+// The bell: polled by the page so new enquiries show up without a reload.
+router.get('/api/notifications', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
+  try {
+    res.json(await notificationSummary(objIdOrNull(req.user.userId)));
+  } catch (e) { res.status(500).json({ error: 'Failed to load notifications' }); }
+});
+
+router.post('/api/notifications/read', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
+  try {
+    res.json({ ok: true, marked: await markAllRead(objIdOrNull(req.user.userId)) });
+  } catch (e) { res.status(500).json({ error: 'Failed to update notifications' }); }
 });
 
 router.get('/api/lead-timeline/:leadId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {

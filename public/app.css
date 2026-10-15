@@ -514,3 +514,18 @@ body {
 [data-bs-theme="dark"] #tgChatWindow { background: #1e293b; border-color: #334155; }
 [data-bs-theme="dark"] #tgChatMessages { background: #0f172a; }
 [data-bs-theme="dark"] .tg-msg-bot { background: #273449; color: #e2e8f0; }
+/* ===== NOTIFICATION BELL ===== */
+.tg-bell-count {
+  position: absolute; top: -6px; right: -6px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: #dc2626; color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center;
+}
+.tg-bell-menu { width: 320px; max-width: calc(100vw - 32px); max-height: 420px; overflow-y: auto; }
+.tg-bell-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--bs-border-color); }
+.tg-bell-empty { padding: 16px 14px; font-size: 13px; color: var(--bs-secondary-color); }
+.tg-bell-item { display: block; padding: 10px 14px; border-bottom: 1px solid var(--bs-border-color); color: inherit; text-decoration: none; }
+.tg-bell-item:last-child { border-bottom: 0; }
+.tg-bell-item:hover { background: var(--bs-tertiary-bg); }
+.tg-bell-item.unread { border-left: 3px solid #2563eb; }
+.tg-bell-title { font-size: 14px; font-weight: 500; }
+.tg-bell-meta { font-size: 12px; color: var(--bs-secondary-color); }

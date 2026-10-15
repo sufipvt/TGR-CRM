@@ -9,6 +9,7 @@ const { audit } = require('./audit');
 const { getNextCaller } = require('./assignment');
 const { phoneKey, findDuplicateLead } = require('./duplicates');
 const { getSettings, clearSettingsCache } = require('./settings');
+const { notifyLeadCaptured } = require('./notify');
 
 const FORM_SOURCE = 'Website Enquiry';
 const WEBHOOK_SOURCE = 'Webhook';
@@ -70,8 +71,15 @@ async function captureLead(input, via, defaults = {}) {
     const when = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const line = `[${when}] Enquired again via ${via}` + (project ? ` about ${project.name}` : '') + (message ? `: ${message}` : '');
     const current = await Lead.findById(dup._id).select('notes').lean();
-    await Lead.updateOne({ _id: dup._id }, { notes: [current && current.notes, line].filter(Boolean).join('\n') });
+    const now = new Date();
+    // Back to the top of the list, marked as re-enquired, so it isn't missed.
+    await Lead.updateOne({ _id: dup._id }, {
+      notes: [current && current.notes, line].filter(Boolean).join('\n'),
+      listed_at: now, last_enquiry_at: now, $inc: { enquiry_count: 1 }
+    });
     await audit(via, 'update', 'Lead', dup._id, { repeat_enquiry: true });
+    const fresh = await Lead.findById(dup._id).select('name phone assigned_caller_id assigned_closer_id').lean();
+    await alert(fresh, true, via);
     return { lead: dup, duplicate: true };
   }
 
@@ -90,7 +98,17 @@ async function captureLead(input, via, defaults = {}) {
     created_at: new Date()
   });
   await audit(via, 'create', 'Lead', lead._id, { name, via });
+  await alert(lead, false, via);
   return { lead, duplicate: false };
+}
+
+// The lead is already saved; a failed alert must not turn the enquiry into an error.
+async function alert(lead, duplicate, via) {
+  try {
+    await notifyLeadCaptured(lead, { duplicate, via });
+  } catch (e) {
+    console.error('Lead alert failed:', e.message);
+  }
 }
 
 // Google Ads lead form webhooks send fields as user_column_data; map them to ours.

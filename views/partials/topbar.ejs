@@ -8,6 +8,30 @@
     <button class="tg-theme-toggle" id="tgThemeToggle" onclick="tgToggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
       <i class="fa-solid fa-moon" id="tgThemeIcon" aria-hidden="true"></i>
     </button>
+    <% const notif = (typeof data !== 'undefined' && data.notif) || { unread: 0, items: [] }; %>
+    <div class="dropdown">
+      <button class="tg-theme-toggle position-relative" id="tgBell" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false" aria-label="Notifications" title="Notifications">
+        <i class="fa-solid fa-bell" aria-hidden="true"></i>
+        <span class="tg-bell-count" id="tgBellCount" <%= notif.unread ? '' : 'hidden' %>><%= notif.unread > 99 ? '99+' : notif.unread %></span>
+      </button>
+      <div class="dropdown-menu dropdown-menu-end tg-bell-menu p-0" aria-labelledby="tgBell">
+        <div class="tg-bell-head">
+          <span class="fw-semibold">Notifications</span>
+          <button type="button" class="btn btn-link btn-sm p-0" id="tgBellDesktop" hidden onclick="tgEnableDesktopAlerts()">Turn on desktop alerts</button>
+        </div>
+        <div id="tgBellList">
+          <% if (!notif.items.length) { %>
+            <div class="tg-bell-empty">No notifications yet. New enquiries will show up here.</div>
+          <% } %>
+          <% notif.items.forEach(n => { %>
+            <a class="tg-bell-item<%= n.read ? '' : ' unread' %>" href="<%= n.link || '#' %>">
+              <div class="tg-bell-title"><%= n.title %></div>
+              <div class="tg-bell-meta"><%= n.body %> · <%= n.when %></div>
+            </a>
+          <% }) %>
+        </div>
+      </div>
+    </div>
     <span class="tg-welcome d-none d-md-inline">Welcome, <%= user.name %></span>
     <span class="tg-profile-pill"><%= user.name %> <span class="badge tg-role-badge"><%= user.role %></span></span>
   </div>
