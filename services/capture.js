@@ -76,6 +76,7 @@ async function captureLead(input, via, defaults = {}) {
   }
 
   const source = await findSource(input.source_id || defaults.sourceId, input.source, defaults.sourceName || FORM_SOURCE);
+  const caller = await getNextCaller({ project_id: project ? project._id : null, source_id: source._id });
   const lead = await Lead.create({
     name, phone,
     email: text(input.email, 120),
@@ -83,7 +84,7 @@ async function captureLead(input, via, defaults = {}) {
     budget_range: text(input.budget, 60),
     source_id: source._id,
     project_id: project ? project._id : null,
-    assigned_caller_id: await getNextCaller(),
+    assigned_caller_id: caller,
     status: 'New',
     notes: [`Captured via ${via}`, message].filter(Boolean).join(': '),
     created_at: new Date()

@@ -108,7 +108,7 @@ router.post('/app/import-leads', requireAuth, expensiveOpLimiter, refreshUserCon
             ? await Project.findOne({ name: new RegExp('^' + escapeRegex(project_name) + '$', 'i') })
             : null;
 
-          const caller_id = await getNextCaller();
+          const caller_id = await getNextCaller({ project_id: project ? project._id : null, source_id: source._id });
 
           const lead = await Lead.create({
             name,

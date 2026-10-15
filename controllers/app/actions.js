@@ -19,6 +19,8 @@ const { phoneKey, findDuplicateLead } = require('../../services/duplicates');
 const { captureSettings, setSetting, newWebhookKey } = require('../../services/capture');
 const { userContextCache } = require('../../middleware/auth');
 
+const BULK_LIMIT = 200;
+
 function forbidden(msg) { return Object.assign(new Error(msg || 'Forbidden'), { status: 403 }); }
 
 // Every id the user picks for someone to own the record must be inside their reach.
@@ -45,6 +47,13 @@ async function assertNotDuplicate(user, body, leadId) {
   throw Object.assign(new Error(`This phone number already belongs to ${who}. Tick "Save anyway" to keep both.`), { status: 409 });
 }
 
+// Admins choose which team gets new leads for a project or source. The field is
+// only on the admin form, and ignored from anyone else.
+function withRoutingTeam(user, body, fields) {
+  if (isAdminRole(user.role) && body.team_id !== undefined) fields.team_id = objIdOrNull(body.team_id);
+  return fields;
+}
+
 async function handlePostAction(req) {
   const body = cleanBody(req.body);
   const action = body.action;
@@ -55,7 +64,8 @@ async function handlePostAction(req) {
     case 'add_lead': {
       await assertAssignable(user, objIdOrNull(body.assigned_caller_id), objIdOrNull(body.assigned_closer_id));
       await assertNotDuplicate(user, body);
-      const caller = objIdOrNull(body.assigned_caller_id) || await getNextCaller();
+      const caller = objIdOrNull(body.assigned_caller_id)
+        || await getNextCaller({ project_id: objIdOrNull(body.project_id), source_id: objIdOrNull(body.source_id) });
       const lead = await Lead.create({
         name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
         source_id: objIdOrNull(body.source_id),
@@ -152,24 +162,52 @@ async function handlePostAction(req) {
       await audit(user.email, 'update', 'Lead', body.lead_id, { qualified: true });
       return 'Lead qualified.';
     }
+    case 'bulk_update_leads': {
+      // Ticked rows on the Leads page. Each lead is checked on its own, so a
+      // tampered id list can only touch leads this user could edit anyway.
+      const ids = [...new Set([].concat(req.body.lead_ids || []).map(String))].map(objIdOrNull).filter(Boolean);
+      if (!ids.length) throw Object.assign(new Error('Select at least one lead.'), { status: 400 });
+      if (ids.length > BULK_LIMIT) throw Object.assign(new Error(`Select up to ${BULK_LIMIT} leads at a time.`), { status: 400 });
+      const status = body.bulk_status && LEAD_STATUSES.includes(body.bulk_status) && body.bulk_status !== 'Booked' ? body.bulk_status : null;
+      const caller = manager ? objIdOrNull(body.bulk_caller_id) : null;
+      if (!status && !caller) throw Object.assign(new Error('Choose a new status or agent.'), { status: 400 });
+      if (caller) await assertAssignable(user, caller);
+      let updated = 0;
+      for (const id of ids) {
+        if (!(await canEditLead(user, id))) continue;
+        const lead = await Lead.findById(id).select('qualified_at');
+        if (!lead) continue;
+        const update = {};
+        if (status) {
+          update.status = status;
+          if (status === 'Qualified' && !lead.qualified_at) update.qualified_at = new Date();
+        }
+        if (caller) update.assigned_caller_id = caller;
+        await Lead.updateOne({ _id: id }, update);
+        await audit(user.email, 'update', 'Lead', id, { bulk: true, ...(status ? { status } : {}), ...(caller ? { assigned_caller_id: String(caller) } : {}) });
+        updated++;
+      }
+      const skipped = ids.length - updated;
+      return `Updated ${updated} lead${updated === 1 ? '' : 's'}.` + (skipped ? ` ${skipped} skipped (not yours to change).` : '');
+    }
     case 'add_project': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      const p = await Project.create({
+      const p = await Project.create(withRoutingTeam(user, body, {
         name: body.name, developer: body.developer, location: body.location, city: body.city,
         state: body.state, project_type: body.project_type || 'Other', status: body.status || 'Upcoming',
         total_units: Number(body.total_units || 0), available_units: Number(body.available_units || 0),
         price_range: body.price_range, notes: body.notes
-      });
+      }));
       await audit(user.email, 'create', 'Project', p._id, { name: body.name });
       return 'Project added.';
     }
     case 'update_project': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      const update = {
+      const update = withRoutingTeam(user, body, {
         name: body.name, developer: body.developer, location: body.location, city: body.city,
         state: body.state, project_type: body.project_type, status: body.status,
         price_range: body.price_range, notes: body.notes
-      };
+      });
       // Locked (not sent) when the project has units: its counts come from them.
       if (body.total_units !== undefined) update.total_units = Number(body.total_units || 0);
       if (body.available_units !== undefined) update.available_units = Number(body.available_units || 0);
@@ -199,13 +237,13 @@ async function handlePostAction(req) {
     }
     case 'add_source': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      const s = await LeadSource.create({ name: body.name, channel: body.channel, active: body.active === 'true' || body.active === 'on', notes: body.notes });
+      const s = await LeadSource.create(withRoutingTeam(user, body, { name: body.name, channel: body.channel, active: body.active === 'true' || body.active === 'on', notes: body.notes }));
       await audit(user.email, 'create', 'LeadSource', s._id, { name: body.name });
       return 'Source added.';
     }
     case 'update_source': {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      await LeadSource.findByIdAndUpdate(body.source_id, { name: body.name, channel: body.channel, active: body.active === 'true' || body.active === 'on', notes: body.notes });
+      await LeadSource.findByIdAndUpdate(body.source_id, withRoutingTeam(user, body, { name: body.name, channel: body.channel, active: body.active === 'true' || body.active === 'on', notes: body.notes }));
       await audit(user.email, 'update', 'LeadSource', body.source_id, { name: body.name });
       return 'Source updated.';
     }
