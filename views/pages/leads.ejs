@@ -51,14 +51,32 @@
       </div>
 
       <div id="tgTableView">
+      <!-- Bulk actions: row checkboxes join this form through their form="" attribute -->
+      <form method="POST" action="<%= leadsUrl %>" id="bulkLeadForm" class="tg-bulk-bar border rounded p-2 mb-2 align-items-center gap-2 flex-wrap" hidden
+            onsubmit="return tgConfirmBulk(this)">
+        <input type="hidden" name="action" value="bulk_update_leads">
+        <span class="fw-medium me-1"><span id="bulkCount">0</span> selected</span>
+        <select name="bulk_status" class="form-select form-select-sm w-auto" aria-label="New status for selected leads">
+          <option value="">Status: no change</option>
+          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+        </select>
+        <% if (isManager) { %>
+          <select name="bulk_caller_id" class="form-select form-select-sm w-auto" aria-label="New agent for selected leads">
+            <option value="">Agent: no change</option>
+            <% data.users.filter(u => ['Team Leader','Sub Team Leader'].includes(u.role)).forEach(u => { %><option value="<%= u._id %>"><%= u.full_name %><%= u.role === 'Team Leader' ? ' (TL)' : '' %></option><% }) %>
+          </select>
+        <% } %>
+        <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+        <button type="button" class="btn btn-sm btn-link" onclick="tgClearBulk()">Clear</button>
+      </form>
       <div class="table-responsive">
         <table class="table tg-table align-middle" id="leadsTable">
           <thead>
-            <tr><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Temp</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+            <tr><th><input type="checkbox" class="form-check-input" id="bulkAll" aria-label="Select all leads on this page" onchange="tgBulkSelectAll(this.checked)"></th><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Temp</th><th>Status</th><th>Created</th><th>Actions</th></tr>
           </thead>
           <tbody>
             <% if (!data.leads.length) { %>
-              <tr><td colspan="10" class="text-secondary text-center py-4"><%= hasFilter ? 'No leads match these filters.' : 'No leads found. Add your first lead to get started.' %></td></tr>
+              <tr><td colspan="11" class="text-secondary text-center py-4"><%= hasFilter ? 'No leads match these filters.' : 'No leads found. Add your first lead to get started.' %></td></tr>
             <% } %>
             <% data.leads.forEach(lead => { %>
               <%
@@ -67,6 +85,7 @@
              <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
                   data-temperature="<%= lead.temperature || '' %>"
                   data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
+                <td><% if (canEdit) { %><input type="checkbox" class="form-check-input tg-bulk" form="bulkLeadForm" name="lead_ids" value="<%= lead._id %>" aria-label="Select <%= lead.name %>" onchange="tgBulkChanged()"><% } %></td>
                 <td>
                   <div class="fw-medium"><%= lead.name %></div>
                   <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>

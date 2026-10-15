@@ -5,18 +5,20 @@
       </div>
       <div class="table-responsive">
         <table class="table tg-table align-middle mb-0">
-          <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>Notes</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>New leads to</th><th>Notes</th><th>Actions</th></tr></thead>
           <tbody>
-            <% if (!data.sources.length) { %><tr><td colspan="5" class="text-secondary text-center py-4">No sources yet.</td></tr><% } %>
+            <% if (!data.sources.length) { %><tr><td colspan="6" class="text-secondary text-center py-4">No sources yet.</td></tr><% } %>
             <% data.sources.forEach(s => { %>
               <tr>
                 <td class="fw-medium"><%= s.name %></td>
                 <td><span class="badge text-bg-light border"><%= s.channel || '—' %></span></td>
                 <td><span class="badge text-bg-<%= s.active ? 'success' : 'secondary' %>"><%= s.active ? 'Active' : 'Inactive' %></span></td>
+                <% const srcTeam = s.team_id && (data.teams || []).find(t => String(t._id) === String(s.team_id)); %>
+                <td style="font-size:13px;"><%= srcTeam ? srcTeam.name : 'Any team' %></td>
                 <td class="text-secondary" style="font-size:13px;"><%= s.notes || '—' %></td>
                 <td class="text-nowrap">
                   <button class="btn btn-sm btn-outline-primary" aria-label="Edit source"
-                    onclick='tgEditSource(<%= JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
+                    onclick='tgEditSource(<%= JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "", team_id: s.team_id ? String(s.team_id) : "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <form method="POST" action="/app?page=sources" class="d-inline" onsubmit="return confirm('Delete this source?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="sources"><input type="hidden" name="id" value="<%= s._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
                 </td>
               </tr>
@@ -49,7 +51,17 @@
                 <input type="checkbox" class="form-check-input" id="sr_active" name="active" value="true" checked>
                 <label class="form-check-label" for="sr_active">Active</label>
               </div>
-              <div class="mb-0"><label class="form-label" for="sr_notes">Notes</label><input class="form-control" id="sr_notes" name="notes"></div>
+              <div class="mb-3"><label class="form-label" for="sr_notes">Notes</label><input class="form-control" id="sr_notes" name="notes"></div>
+              <% if (['Super Admin','Admin'].includes(user.role)) { %>
+                <div class="mb-0">
+                  <label class="form-label" for="sr_team">Send new leads to team</label>
+                  <select class="form-select" id="sr_team" name="team_id">
+                    <option value="">Any team (share across all Sub Team Leaders)</option>
+                    <% (data.teams || []).forEach(t => { %><option value="<%= t._id %>"><%= t.name %></option><% }) %>
+                  </select>
+                  <div class="form-text">Auto-assigned leads go to the Sub Team Leader in this team with the fewest open leads.</div>
+                </div>
+                <% } %>
             </div>
             <div class="modal-footer">
               <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>

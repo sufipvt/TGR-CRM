@@ -112,6 +112,9 @@ async function appHandler(req, res) {
       const counts = await unitCountsByProject();
       data.projects_detail = data.projects.map(p => ({ ...p.toObject(), ...unitCountsFor(p, counts) }));
       data.units = await Unit.find().sort('unit_number');
+      data.teams = await Team.find().sort('name').select('name').lean();
+    } else if (page === 'sources') {
+      data.teams = await Team.find().sort('name').select('name').lean();
     } else if (page === 'users') {
       data.users = await User.find().sort('full_name').select('-password').populate('team_id');
       data.teams = await Team.find().sort('name');

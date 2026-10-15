@@ -274,6 +274,34 @@ async function tgCopy(id, btn) {
   }
 }
 
+/* ============================ BULK LEAD ACTIONS ===================== */
+function tgBulkChanged() {
+  const n = document.querySelectorAll('.tg-bulk:checked').length;
+  const bar = document.getElementById('bulkLeadForm');
+  if (!bar) return;
+  bar.hidden = n === 0;
+  bar.classList.toggle('d-flex', n > 0);
+  document.getElementById('bulkCount').textContent = n;
+  const all = document.getElementById('bulkAll');
+  if (all) all.checked = n > 0 && n === document.querySelectorAll('.tg-bulk').length;
+}
+
+function tgBulkSelectAll(on) {
+  document.querySelectorAll('.tg-bulk').forEach(cb => { cb.checked = on; });
+  tgBulkChanged();
+}
+
+function tgClearBulk() { tgBulkSelectAll(false); }
+
+function tgConfirmBulk(form) {
+  const n = document.querySelectorAll('.tg-bulk:checked').length;
+  if (!form.bulk_status.value && !(form.bulk_caller_id && form.bulk_caller_id.value)) {
+    alert('Choose a new status or agent first.');
+    return false;
+  }
+  return confirm('Update ' + n + ' lead' + (n === 1 ? '' : 's') + '?');
+}
+
 function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -477,6 +505,7 @@ function tgEditProject(p) {
   tgLockUnitCounts(p.from_units);
   setVal('pr_price', p.price_range);
   setVal('pr_notes', p.notes);
+  setVal('pr_team', p.team_id);
   const title = document.getElementById('projectModalTitle');
   if (title) title.textContent = 'Edit Project';
   new bootstrap.Modal(document.getElementById('projectModal')).show();
@@ -527,6 +556,7 @@ function tgEditSource(s) {
   setVal('sr_name', s.name);
   setVal('sr_channel', s.channel);
   setVal('sr_notes', s.notes);
+  setVal('sr_team', s.team_id);
   const cb = document.getElementById('sr_active');
   if (cb) cb.checked = !!s.active;
   const title = document.getElementById('sourceModalTitle');

@@ -23,6 +23,8 @@
 <%= p.available_units %>/<%= p.total_units %> units available
               </span>
               <% if (p.price_range) { %><span class="text-secondary"><%= p.price_range %></span><% } %>
+              <% const routeTeam = p.team_id && (data.teams || []).find(t => String(t._id) === String(p.team_id)); %>
+              <% if (routeTeam) { %><span class="text-secondary">New leads → <%= routeTeam.name %></span><% } %>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#units-<%= p._id %>">Manage Units (<%= pUnits.length %>)</button>
@@ -31,6 +33,7 @@
                   _id: String(p._id), name: p.name, developer: p.developer || "", location: p.location || "",
                   city: p.city || "", state: p.state || "", project_type: p.project_type || "Other",
                   status: p.status, total_units: p.total_units, available_units: p.available_units, from_units: p.from_units,
+                  team_id: p.team_id ? String(p.team_id) : "",
                   price_range: p.price_range || "", notes: p.notes || ""
                 }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
               <form method="POST" action="/app?page=projects" class="d-inline" onsubmit="return confirm('Delete this project?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="projects"><input type="hidden" name="id" value="<%= p._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete project"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>
@@ -103,6 +106,16 @@
                 <div class="col-md-6"><label class="form-label" for="pr_total">Total Units</label><input type="number" class="form-control" id="pr_total" name="total_units" min="0"></div>
                 <div class="col-md-6"><label class="form-label" for="pr_avail">Available Units</label><input type="number" class="form-control" id="pr_avail" name="available_units" min="0"></div>
                 <div class="col-12 form-text mt-0" id="pr_units_hint" hidden>These are counted from the units you've added to this project. Add, edit or book units to change them.</div>
+<% if (['Super Admin','Admin'].includes(user.role)) { %>
+                <div class="col-12">
+                  <label class="form-label" for="pr_team">Send new leads to team</label>
+                  <select class="form-select" id="pr_team" name="team_id">
+                    <option value="">Any team (share across all Sub Team Leaders)</option>
+                    <% (data.teams || []).forEach(t => { %><option value="<%= t._id %>"><%= t.name %></option><% }) %>
+                  </select>
+                  <div class="form-text">Auto-assigned leads go to the Sub Team Leader in this team with the fewest open leads.</div>
+                </div>
+                <% } %>
                 <div class="col-12"><label class="form-label" for="pr_notes">Notes</label><textarea class="form-control" id="pr_notes" name="notes" rows="2"></textarea></div>
               </div>
             </div>

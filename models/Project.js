@@ -13,6 +13,7 @@ module.exports = mongoose.model('Project', new Schema({
   total_units:     { type: Number, default: 0 },
   available_units: { type: Number, default: 0 },
   price_range:     String,
+  team_id:         { type: Schema.Types.ObjectId, ref: 'Team' }, // new leads for this project go to this team
   notes:           String,
   created_at:      { type: Date, default: Date.now }
 }));
