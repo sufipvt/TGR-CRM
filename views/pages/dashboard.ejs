@@ -1,40 +1,106 @@
+    <%
+      const T = data.today;
+      const kpis = [
+        { label: 'Total Leads', value: data.total_leads, cls: 'tg-kpi-blue', icon: 'fa-user-group', href: '/app?page=leads' },
+        { label: 'New Today', value: data.new_today, cls: 'tg-kpi-teal', icon: 'fa-bolt', href: '/app?page=leads' },
+        { label: 'Hot Leads', value: T.hot.total, cls: 'tg-kpi-red', icon: 'fa-fire', href: '/app?page=leads&temperature=Hot' },
+        { label: 'Pending Follow-Ups', value: data.pending_followups, cls: data.overdue_followups > 0 ? 'tg-kpi-red' : 'tg-kpi-indigo', icon: 'fa-bell', href: '/app?page=followups',
+          sub: data.overdue_followups > 0 ? data.overdue_followups + ' overdue' : '' },
+        { label: 'Bookings', value: data.total_bookings, cls: 'tg-kpi-orange', icon: 'fa-file-signature', href: '/app?page=bookings' },
+        { label: 'Total Revenue', value: formatMoney(data.total_revenue), cls: 'tg-kpi-green', icon: 'fa-indian-rupee-sign', href: isManager ? '/app?page=reports' : '/app?page=bookings' }
+      ];
+      const fmtTime = d => new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+      const tabs = [
+        { key: 'calls', label: 'Calls due', list: T.calls, all: '/app?page=followups' },
+        { key: 'uncalled', label: 'New, not called', list: T.uncalled, all: '/app?page=leads&status=New' },
+        { key: 'hot', label: 'Hot leads', list: T.hot, all: '/app?page=leads&temperature=Hot' },
+        { key: 'visits', label: 'Site visits today', list: T.visits, all: '/app?page=followups' }
+      ];
+    %>
     <div class="row g-3 mb-4">
-      <div class="col-6 col-md-4 col-xl">
-        <div class="tg-kpi tg-kpi-blue">
-          <div class="tg-kpi-label">Total Leads</div>
-          <div class="tg-kpi-value"><%= data.total_leads %></div>
-          <i class="fa-solid fa-user-group tg-kpi-icon" aria-hidden="true"></i>
+      <% kpis.forEach(k => { %>
+        <div class="col-6 col-md-4 col-xl-2">
+          <a class="tg-kpi tg-kpi-link <%= k.cls %>" href="<%= k.href %>">
+            <div class="tg-kpi-label"><%= k.label %></div>
+            <div class="tg-kpi-value"><%= k.value %></div>
+            <% if (k.sub) { %><div class="tg-kpi-sub"><%= k.sub %></div><% } %>
+            <i class="fa-solid <%= k.icon %> tg-kpi-icon" aria-hidden="true"></i>
+          </a>
+        </div>
+      <% }) %>
+    </div>
+
+    <% function contactButtons(lead) { const L = T.phoneLinks(lead.phone); %>
+      <% if (L.tel) { %><a class="btn btn-sm btn-outline-success" href="<%= L.tel %>" title="Call" aria-label="Call <%= lead.name %>"><i class="fa-solid fa-phone" aria-hidden="true"></i></a><% } %>
+      <% if (L.wa) { %><a class="btn btn-sm btn-outline-success" href="<%= L.wa %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a><% } %>
+      <a class="btn btn-sm btn-outline-secondary" href="/app?page=leads&q=<%= encodeURIComponent(lead.phone) %>" title="Open lead" aria-label="Open <%= lead.name %>"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+    <% } %>
+    <% function tempBadge(lead) { %>
+      <% if (lead.temperature === 'Hot') { %><span class="badge text-bg-danger">🔥 Hot</span><% } else if (lead.temperature === 'Warm') { %><span class="badge text-bg-warning">☀️ Warm</span><% } %>
+      <% if (lead.last_enquiry_at) { %><span class="badge text-bg-warning">Re-enquired</span><% } %>
+    <% } %>
+
+    <div class="tg-panel mb-4" id="todayPanel">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+        <h2 class="tg-panel-title mb-0">Today</h2>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="/app?page=leads#new" class="btn btn-sm btn-primary"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Lead</a>
+          <a href="/app?page=followups#new" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-bell me-1" aria-hidden="true"></i>Follow-up</a>
+          <a href="/app?page=bookings#new" class="btn btn-sm btn-outline-primary"><i class="fa-solid fa-file-signature me-1" aria-hidden="true"></i>Booking</a>
         </div>
       </div>
-      <div class="col-6 col-md-4 col-xl">
-        <div class="tg-kpi tg-kpi-teal">
-          <div class="tg-kpi-label">New Today</div>
-          <div class="tg-kpi-value"><%= data.new_today %></div>
-          <i class="fa-solid fa-bolt tg-kpi-icon" aria-hidden="true"></i>
-        </div>
+      <ul class="nav nav-pills tg-today-tabs flex-nowrap overflow-auto mb-3" role="tablist">
+        <% tabs.forEach((t, i) => { %>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link text-nowrap <%= i === 0 ? 'active' : '' %>" id="today-<%= t.key %>-tab" data-bs-toggle="pill" data-bs-target="#today-<%= t.key %>" type="button" role="tab" aria-controls="today-<%= t.key %>" aria-selected="<%= i === 0 %>">
+              <%= t.label %> <span class="badge <%= t.list.total ? 'text-bg-danger' : 'text-bg-secondary' %>"><%= t.list.total %></span>
+            </button>
+          </li>
+        <% }) %>
+      </ul>
+      <div class="tab-content">
+        <% tabs.forEach((t, i) => { %>
+          <div class="tab-pane fade <%= i === 0 ? 'show active' : '' %>" id="today-<%= t.key %>" role="tabpanel" aria-labelledby="today-<%= t.key %>-tab">
+            <% if (!t.list.items.length) { %>
+              <p class="text-secondary mb-0 py-2" style="font-size:14px;">Nothing here. Nice work.</p>
+            <% } %>
+            <% t.list.items.forEach(item => { %>
+              <% const isFu = t.key === 'calls' || t.key === 'visits'; const lead = isFu ? item.lead_id : item; if (!lead) return; %>
+              <div class="tg-today-row">
+                <div class="me-auto">
+                  <div class="fw-medium"><%= lead.name %> <% tempBadge(lead) %></div>
+                  <div class="text-secondary" style="font-size:12px;">
+                    <%= lead.phone %>
+                    <% if (isFu) { %>
+                      · <%= item.type %>
+                      · <span class="<%= item.status === 'Pending' && new Date(item.scheduled_date) < T.now ? 'text-danger fw-medium' : '' %>"><%= new Date(item.scheduled_date) < new Date(new Date(T.now).setHours(0,0,0,0)) ? formatDateTime(item.scheduled_date) : fmtTime(item.scheduled_date) %><%= item.status === 'Pending' && new Date(item.scheduled_date) < T.now ? ' (overdue)' : '' %></span>
+                      <% if (isManager && item.assigned_to_id) { %> · <%= item.assigned_to_id.full_name %><% } %>
+                      <% if (item.notes) { %><div class="text-truncate" style="max-width:420px;"><%= item.notes %></div><% } %>
+                    <% } else { %>
+                      · <%= formatDate(lead.created_at) %>
+                      <% if (isManager && lead.assigned_caller_id) { %> · <%= lead.assigned_caller_id.full_name %><% } %>
+                    <% } %>
+                  </div>
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                  <% contactButtons(lead) %>
+                  <% if (isFu && item.status === 'Pending') { %>
+                    <button type="button" class="btn btn-sm btn-success" onclick="tgCompleteFollowup('<%= item._id %>')" title="Mark done">Done</button>
+                  <% } %>
+                </div>
+              </div>
+            <% }) %>
+            <% if (t.list.total > t.list.items.length) { %>
+              <a class="d-inline-block mt-2" style="font-size:13px;" href="<%= t.all %>">See all <%= t.list.total %></a>
+            <% } %>
+          </div>
+        <% }) %>
       </div>
-      <div class="col-6 col-md-4 col-xl">
-        <div class="tg-kpi <%= data.overdue_followups > 0 ? 'tg-kpi-red' : 'tg-kpi-indigo' %>">
-          <div class="tg-kpi-label">Pending Follow-Ups</div>
-          <div class="tg-kpi-value"><%= data.pending_followups %></div>
-          <% if (data.overdue_followups > 0) { %><div class="tg-kpi-sub"><%= data.overdue_followups %> overdue</div><% } %>
-          <i class="fa-solid fa-bell tg-kpi-icon" aria-hidden="true"></i>
-        </div>
-      </div>
-      <div class="col-6 col-md-6 col-xl">
-        <div class="tg-kpi tg-kpi-orange">
-          <div class="tg-kpi-label">Bookings</div>
-          <div class="tg-kpi-value"><%= data.total_bookings %></div>
-          <i class="fa-solid fa-file-signature tg-kpi-icon" aria-hidden="true"></i>
-        </div>
-      </div>
-      <div class="col-12 col-md-6 col-xl">
-        <div class="tg-kpi tg-kpi-green">
-          <div class="tg-kpi-label">Total Revenue</div>
-          <div class="tg-kpi-value"><%= formatMoney(data.total_revenue) %></div>
-          <i class="fa-solid fa-indian-rupee-sign tg-kpi-icon" aria-hidden="true"></i>
-        </div>
-      </div>
+      <form method="POST" action="/app?page=dashboard" id="completeFuForm" class="d-none">
+        <input type="hidden" name="action" value="complete_followup">
+        <input type="hidden" name="followup_id" id="completeFuId">
+        <input type="hidden" name="outcome" id="completeFuOutcome">
+      </form>
     </div>
 
     <div class="row g-3 mb-4">
@@ -88,10 +154,11 @@
         <div class="tg-panel">
           <h2 class="tg-panel-title">Quick Actions</h2>
           <div class="d-flex flex-column gap-2">
-            <a href="/app?page=leads" class="btn btn-outline-primary text-start"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Add Lead</a>
-            <a href="/app?page=followups" class="btn btn-outline-primary text-start"><i class="fa-solid fa-bell me-2" aria-hidden="true"></i>View Follow-Ups</a>
-            <a href="/app?page=bookings" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
+            <a href="/app?page=leads#new" class="btn btn-outline-primary text-start"><i class="fa-solid fa-plus me-2" aria-hidden="true"></i>Add Lead</a>
+            <a href="/app?page=followups#new" class="btn btn-outline-primary text-start"><i class="fa-solid fa-bell me-2" aria-hidden="true"></i>Schedule Follow-Up</a>
+            <a href="/app?page=bookings#new" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-signature me-2" aria-hidden="true"></i>Record Booking</a>
             <% if (isManager) { %>
+              <a href="/app?page=leads#import" class="btn btn-outline-primary text-start"><i class="fa-solid fa-file-import me-2" aria-hidden="true"></i>Import Leads (CSV)</a>
               <a href="/app?page=reports" class="btn btn-outline-primary text-start"><i class="fa-solid fa-chart-line me-2" aria-hidden="true"></i>View Reports</a>
             <% } %>
           </div>
