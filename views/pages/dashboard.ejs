@@ -73,7 +73,7 @@
                 <% } %>
                 <% data.recent_leads.forEach(l => { %>
                   <tr>
-                    <td class="fw-medium"><%= l.name %></td>
+                    <td class="fw-medium"><%= l.name %><% if (l.last_enquiry_at) { %> <span class="badge text-bg-warning" title="Last enquired <%= formatDateTime(l.last_enquiry_at) %>">Re-enquired</span><% } %></td>
                     <td><%= l.source_id ? l.source_id.name : '—' %></td>
                     <td><span class="badge text-bg-<%= statusColors[l.status] || 'secondary' %>"><%= l.status %></span></td>
                     <td class="text-secondary"><%= formatDate(l.created_at) %></td>

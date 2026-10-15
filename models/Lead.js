@@ -3,7 +3,7 @@ const { LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, DISPOSITION_REASONS 
 
 const { Schema } = mongoose;
 
-module.exports = mongoose.model('Lead', new Schema({
+const leadSchema = new Schema({
   name:               { type: String, required: true },
   phone:              { type: String, required: true },
   email:              String,
@@ -20,5 +20,14 @@ module.exports = mongoose.model('Lead', new Schema({
   notes:              String,
   created_at:         { type: Date, default: Date.now, index: true },
   qualified_at:       Date,
-  booked_at:          Date
-}));
+  booked_at:          Date,
+  // Where the lead sits in lists, newest first: when it arrived, or when it last enquired again.
+  listed_at:          { type: Date, default: function () { return this.created_at || new Date(); } },
+  last_enquiry_at:    Date,
+  enquiry_count:      { type: Number, default: 0 }
+});
+
+// Leads from before listed_at existed have none; lists sort them after, by created_at.
+leadSchema.index({ listed_at: -1, created_at: -1 });
+
+module.exports = mongoose.model('Lead', leadSchema);

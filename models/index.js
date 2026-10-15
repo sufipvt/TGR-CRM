@@ -10,5 +10,6 @@ module.exports = {
   Payment: require('./Payment'),
   Team: require('./Team'),
   AuditLog: require('./AuditLog'),
-  Setting: require('./Setting')
+  Setting: require('./Setting'),
+  Notification: require('./Notification')
 };

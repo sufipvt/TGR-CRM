@@ -18,6 +18,7 @@ const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { captureSettings } = require('../../services/capture');
+const { notificationSummary } = require('../../services/notify');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 
@@ -57,6 +58,7 @@ async function appHandler(req, res) {
     const teamScope = isTeamLeader(user.role) ? { team_id: user.team_id } : {};
 
     const data = {};
+    data.notif = await notificationSummary(userId);
     data.projects = await Project.find().sort('name');
     data.sources = await LeadSource.find().sort('name');
 
@@ -73,7 +75,7 @@ async function appHandler(req, res) {
       ]);
       data.total_revenue = rev.length ? rev[0].total : 0;
       data.new_today = await Lead.countDocuments({ ...leadFilter, created_at: { $gte: startOfToday } });
-      data.recent_leads = await Lead.find(leadFilter).sort('-created_at').limit(8).populate('project_id source_id assigned_caller_id');
+      data.recent_leads = await Lead.find(leadFilter).sort({ listed_at: -1, created_at: -1 }).limit(8).populate('project_id source_id assigned_caller_id');
       data.booking_trend = await Booking.aggregate([
         ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
         { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$booking_date' } }, revenue: { $sum: '$sale_value' } } },

@@ -43,7 +43,7 @@ async function loadLeadPage(Lead, visibleFilter, query) {
   const current = Math.min(page, pages);
   const leads = await Lead.find(where)
     .populate('project_id source_id assigned_caller_id assigned_closer_id')
-    .sort('-created_at')
+    .sort({ listed_at: -1, created_at: -1 })
     .skip((current - 1) * LEADS_PER_PAGE)
     .limit(LEADS_PER_PAGE);
   return { leads, list: { ...values, page: current, pages, total, per: LEADS_PER_PAGE } };

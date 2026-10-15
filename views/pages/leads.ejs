@@ -89,6 +89,9 @@
                 <td>
                   <div class="fw-medium"><%= lead.name %></div>
                   <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
+                  <% if (lead.last_enquiry_at) { %>
+                    <span class="badge text-bg-warning" title="Last enquired <%= formatDateTime(lead.last_enquiry_at) %>">Re-enquired<%= lead.enquiry_count > 1 ? ' ×' + lead.enquiry_count : '' %></span>
+                  <% } %>
                 </td>
                 <td>
                   <%= lead.phone %>
