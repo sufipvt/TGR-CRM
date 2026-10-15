@@ -85,7 +85,7 @@
                 <div class="d-flex gap-1 flex-shrink-0">
                   <% contactButtons(lead) %>
                   <% if (isFu && item.status === 'Pending') { %>
-                    <button type="button" class="btn btn-sm btn-success" onclick="tgCompleteFollowup('<%= item._id %>')" title="Mark done">Done</button>
+                    <button type="button" class="btn btn-sm btn-success" onclick='tgCompleteFollowup(<%= JSON.stringify(String(item._id)) %>, <%= JSON.stringify(item.type) %>)' title="Mark done">Done</button>
                   <% } %>
                 </div>
               </div>
@@ -100,6 +100,7 @@
         <input type="hidden" name="action" value="complete_followup">
         <input type="hidden" name="followup_id" id="completeFuId">
         <input type="hidden" name="outcome" id="completeFuOutcome">
+        <input type="hidden" name="visit_outcome" id="completeFuVisit">
       </form>
     </div>
 

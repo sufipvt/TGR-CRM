@@ -2,7 +2,7 @@
 const bcrypt = require('bcryptjs');
 const { Types } = require('mongoose');
 const {
-  LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, NOT_INTERESTED_REASONS, LOST_REASONS
+  LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, NOT_INTERESTED_REASONS, LOST_REASONS, SITE_VISIT_OUTCOMES
 } = require('../../config/constants');
 const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team, Setting
@@ -301,9 +301,16 @@ async function handlePostAction(req) {
       const f = await FollowUp.findById(body.followup_id);
       if (!f) throw Object.assign(new Error('Not found'), { status: 404 });
       if (!(await canActForUser(user, f.assigned_to_id))) throw forbidden();
-      await FollowUp.findByIdAndUpdate(body.followup_id, { status: 'Completed', completed_date: new Date(), outcome: body.outcome || '' });
-      await audit(user.email, 'update', 'FollowUp', body.followup_id, { completed: true });
-      return 'Follow-up completed.';
+      const update = { status: 'Completed', completed_date: new Date(), outcome: body.outcome || '' };
+      if (f.type === 'Site Visit') {
+        if (!SITE_VISIT_OUTCOMES.includes(body.visit_outcome)) throw Object.assign(new Error('Pick how the site visit went.'), { status: 400 });
+        update.visit_outcome = body.visit_outcome;
+        if (body.visit_outcome === 'No show') update.status = 'Missed';
+      }
+      await FollowUp.findByIdAndUpdate(body.followup_id, update);
+      await audit(user.email, 'update', 'FollowUp', body.followup_id, { completed: true, ...(update.visit_outcome ? { visit_outcome: update.visit_outcome } : {}) });
+      if (f.type !== 'Site Visit') return 'Follow-up completed.';
+      return update.status === 'Missed' ? 'Site visit marked as a no-show.' : 'Site visit recorded: ' + update.visit_outcome + '.';
     }
     case 'add_booking': {
       const leadId = objIdOrNull(body.lead_id);

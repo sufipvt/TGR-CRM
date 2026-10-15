@@ -7,7 +7,16 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label fw-medium">Outcome <span class="text-secondary">(optional)</span></label>
+        <%# Same list as SITE_VISIT_OUTCOMES in config/constants.js (test/site-visits.test.js checks they match) %>
+        <div class="mb-3" id="completeVisitWrap" hidden>
+          <label class="form-label fw-medium" for="completeVisitOutcome">How did the visit go? *</label>
+          <select class="form-select" id="completeVisitOutcome">
+            <option value="">Choose…</option>
+            <% ['Interested', 'Thinking it over', 'Wants another visit', 'Not interested', 'No show'].forEach(o => { %><option value="<%= o %>"><%= o %></option><% }) %>
+          </select>
+          <div class="invalid-feedback">Pick how the site visit went.</div>
+        </div>
+        <label class="form-label fw-medium" for="completeOutcomeInput">Notes <span class="text-secondary">(optional)</span></label>
         <textarea class="form-control" id="completeOutcomeInput" rows="2"
           placeholder="e.g. Interested, will visit Saturday"></textarea>
       </div>

@@ -92,4 +92,44 @@ async function resolveReportScope(user, scopeParam) {
   return { label: user.name, memberIds: [new Types.ObjectId(user.userId)] };
 }
 
-module.exports = { reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope };
+// Site visits scheduled in the range: how many happened, no-shows, how they went,
+// and how many of the visited leads have since booked. Per agent and in total.
+async function siteVisitReport(fuScopeFilter, from, to) {
+  const rows = await FollowUp.aggregate([
+    { $match: { ...fuScopeFilter, type: 'Site Visit', scheduled_date: { $gte: from, $lte: to } } },
+    { $lookup: { from: 'leads', localField: 'lead_id', foreignField: '_id', as: 'lead' } },
+    { $addFields: { lead_status: { $arrayElemAt: ['$lead.status', 0] } } },
+    { $group: {
+        _id: '$assigned_to_id',
+        scheduled: { $sum: 1 },
+        done: { $sum: { $cond: [{ $eq: ['$status', 'Completed'] }, 1, 0] } },
+        no_show: { $sum: { $cond: [{ $eq: ['$status', 'Missed'] }, 1, 0] } },
+        pending: { $sum: { $cond: [{ $eq: ['$status', 'Pending'] }, 1, 0] } },
+        interested: { $sum: { $cond: [{ $eq: ['$visit_outcome', 'Interested'] }, 1, 0] } },
+        visited: { $addToSet: { $cond: [{ $eq: ['$status', 'Completed'] }, '$lead_id', null] } },
+        booked: { $addToSet: { $cond: [{ $and: [{ $eq: ['$status', 'Completed'] }, { $eq: ['$lead_status', 'Booked'] }] }, '$lead_id', null] } },
+        outcomes: { $push: '$visit_outcome' }
+    }},
+    { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'user' } },
+    { $sort: { scheduled: -1 } }
+  ]);
+
+  const total = { scheduled: 0, done: 0, no_show: 0, pending: 0, interested: 0, visited: 0, booked: 0 };
+  const outcomes = {};
+  const agents = rows.map(r => {
+    const row = {
+      name: r.user[0] ? r.user[0].full_name : 'Unknown',
+      scheduled: r.scheduled, done: r.done, no_show: r.no_show, pending: r.pending,
+      interested: r.interested, visited: r.visited.filter(Boolean).length, booked: r.booked.filter(Boolean).length
+    };
+    for (const k of Object.keys(total)) total[k] += row[k];
+    r.outcomes.filter(Boolean).forEach(o => { outcomes[o] = (outcomes[o] || 0) + 1; });
+    return row;
+  });
+  const pct = (a, b) => (b ? Math.round(a / b * 100) : 0);
+  total.show_rate = pct(total.done, total.done + total.no_show);
+  total.booking_rate = pct(total.booked, total.visited);
+  return { total, agents, outcomes };
+}
+
+module.exports = { reportRange, buildPerformanceReport, memberMatchFilter, resolveReportScope, siteVisitReport };

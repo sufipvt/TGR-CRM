@@ -21,6 +21,9 @@ const LOST_REASONS = [
   'Chose a Competitor Project', 'Price Negotiation Failed',
   'Financing / Loan Rejected', 'Changed Mind', 'Other'
 ];
+// How a site visit went, asked when it's marked done. 'No show' marks the visit Missed.
+const SITE_VISIT_OUTCOMES = ['Interested', 'Thinking it over', 'Wants another visit', 'Not interested', 'No show'];
+
 const DISPOSITION_REASONS = [...new Set([...NOT_INTERESTED_REASONS, ...LOST_REASONS])];
 
 module.exports = {
@@ -31,5 +34,6 @@ module.exports = {
   BAD_CONTACT_OUTCOMES,
   NOT_INTERESTED_REASONS,
   LOST_REASONS,
-  DISPOSITION_REASONS
+  DISPOSITION_REASONS,
+  SITE_VISIT_OUTCOMES
 };
