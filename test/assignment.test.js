@@ -62,10 +62,11 @@ test('a Team Leader cannot change which team a project routes to', async () => {
 });
 
 test('bulk status change updates only the leads the user may edit', async () => {
-  const res = await as(f.subA).post('/app?page=leads', {
-    action: 'bulk_update_leads', bulk_status: 'Working',
-    lead_ids: [String(f.leadA._id), String(f.leadB._id)]
-  });
+  // Repeated lead_ids fields, as the browser sends them from the row checkboxes.
+  const body = new URLSearchParams({ action: 'bulk_update_leads', bulk_status: 'Working' });
+  body.append('lead_ids', String(f.leadA._id));
+  body.append('lead_ids', String(f.leadB._id));
+  const res = await as(f.subA).post('/app?page=leads', body);
   assert.equal(res.msg, 'Updated 1 lead. 1 skipped (not yours to change).');
   assert.equal((await models.Lead.findById(f.leadA._id).lean()).status, 'Working');
   assert.equal((await models.Lead.findById(f.leadB._id).lean()).status, 'New');
