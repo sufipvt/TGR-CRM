@@ -18,6 +18,7 @@ const { canEditLead, canActForUser, canAssignTo } = require('../../services/acce
 const { phoneKey, findDuplicateLead } = require('../../services/duplicates');
 const { captureSettings, setSetting, newWebhookKey } = require('../../services/capture');
 const { userContextCache } = require('../../middleware/auth');
+const { withLock } = require('../../services/lock');
 
 const BULK_LIMIT = 200;
 
@@ -63,20 +64,24 @@ async function handlePostAction(req) {
   switch (action) {
     case 'add_lead': {
       await assertAssignable(user, objIdOrNull(body.assigned_caller_id), objIdOrNull(body.assigned_closer_id));
-      await assertNotDuplicate(user, body);
-      const caller = objIdOrNull(body.assigned_caller_id)
-        || await getNextCaller({ project_id: objIdOrNull(body.project_id), source_id: objIdOrNull(body.source_id) });
-      const lead = await Lead.create({
-        name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
-        source_id: objIdOrNull(body.source_id),
-        project_id: objIdOrNull(body.project_id),
-        budget_range: body.budget_range || '',
-        status: 'New',
-        temperature: LEAD_TEMPERATURES.includes(body.temperature) ? body.temperature : undefined,
-        assigned_caller_id: caller,
-        assigned_closer_id: objIdOrNull(body.assigned_closer_id),
-        notes: body.notes || '',
-        created_at: new Date()
+      // Same lock as captured leads, so two saves of one phone can't both pass the
+      // duplicate check, and leads saved together still go round the agents in turn.
+      const lead = await withLock('new-lead', async () => {
+        await assertNotDuplicate(user, body);
+        const caller = objIdOrNull(body.assigned_caller_id)
+          || await getNextCaller({ project_id: objIdOrNull(body.project_id), source_id: objIdOrNull(body.source_id) });
+        return Lead.create({
+          name: body.name, phone: body.phone, email: body.email || '', city: body.city || '',
+          source_id: objIdOrNull(body.source_id),
+          project_id: objIdOrNull(body.project_id),
+          budget_range: body.budget_range || '',
+          status: 'New',
+          temperature: LEAD_TEMPERATURES.includes(body.temperature) ? body.temperature : undefined,
+          assigned_caller_id: caller,
+          assigned_closer_id: objIdOrNull(body.assigned_closer_id),
+          notes: body.notes || '',
+          created_at: new Date()
+        });
       });
       await audit(user.email, 'create', 'Lead', lead._id, { name: body.name });
       return 'Lead added.';
@@ -364,15 +369,18 @@ async function handlePostAction(req) {
       const b = await Booking.findById(body.booking_id);
       if (!b) throw Object.assign(new Error('Booking not found'), { status: 404 });
       if (!(await canActForUser(user, b.closer_id))) throw forbidden();
-      const payments = await Payment.find({ booking_id: b._id });
-      const paid = payments.reduce((s, p) => s + p.amount, 0);
       const amt = Number(body.amount || 0);
-      if (amt <= 0) throw Object.assign(new Error('Amount must be positive'), { status: 400 });
-      if (paid + amt > b.sale_value) throw Object.assign(new Error('Payment exceeds sale value. Paid: ' + formatMoney(paid) + ' of ' + formatMoney(b.sale_value)), { status: 400 });
-      const p = await Payment.create({
-        booking_id: b._id, amount: amt,
-        payment_date: body.payment_date ? new Date(body.payment_date) : new Date(),
-        method: body.method || 'Other', reference: body.reference, notes: body.notes
+      if (!(amt > 0)) throw Object.assign(new Error('Amount must be positive'), { status: 400 });
+      // One payment per booking at a time, so two at once can't both fit under the sale value.
+      const p = await withLock('payments:' + b._id, async () => {
+        const payments = await Payment.find({ booking_id: b._id });
+        const paid = payments.reduce((s, x) => s + x.amount, 0);
+        if (paid + amt > b.sale_value) throw Object.assign(new Error('Payment exceeds sale value. Paid: ' + formatMoney(paid) + ' of ' + formatMoney(b.sale_value)), { status: 400 });
+        return Payment.create({
+          booking_id: b._id, amount: amt,
+          payment_date: body.payment_date ? new Date(body.payment_date) : new Date(),
+          method: body.method || 'Other', reference: body.reference, notes: body.notes
+        });
       });
       await audit(user.email, 'create', 'Payment', p._id, { booking_id: String(b._id), amount: amt });
       return 'Payment recorded.';
@@ -387,6 +395,7 @@ async function handlePostAction(req) {
       // If a Team Leader is assigned, update their role + team_id
       if (body.team_leader_id) {
         await User.findByIdAndUpdate(body.team_leader_id, { role: 'Team Leader', team_id: t._id });
+        userContextCache.delete(String(body.team_leader_id));
       }
       await audit(user.email, 'create', 'Team', t._id, { name: body.name });
       return 'Team created.';
@@ -399,10 +408,12 @@ async function handlePostAction(req) {
       // Demote old leader to Sub Team Leader if changed
       if (oldTeam?.team_leader_id && String(oldTeam.team_leader_id) !== String(newLeaderId)) {
         await User.findByIdAndUpdate(oldTeam.team_leader_id, { role: 'Sub Team Leader' });
+        userContextCache.delete(String(oldTeam.team_leader_id));
       }
       // Promote new leader
       if (newLeaderId) {
         await User.findByIdAndUpdate(newLeaderId, { role: 'Team Leader', team_id: body.team_id });
+        userContextCache.delete(String(newLeaderId));
       }
 
       await Team.findByIdAndUpdate(body.team_id, { name: body.name, team_leader_id: newLeaderId });
@@ -424,6 +435,7 @@ async function handlePostAction(req) {
         }
       }
       await User.findByIdAndUpdate(body.user_id, { team_id: objIdOrNull(body.team_id) });
+      userContextCache.delete(String(body.user_id));
       await audit(user.email, 'update', 'User', body.user_id, { team_assigned: body.team_id });
       return 'Team member assigned.';
     }

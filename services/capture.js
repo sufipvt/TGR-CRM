@@ -9,6 +9,7 @@ const { audit } = require('./audit');
 const { getNextCaller } = require('./assignment');
 const { phoneKey, findDuplicateLead } = require('./duplicates');
 const { getSettings, clearSettingsCache } = require('./settings');
+const { withLock } = require('./lock');
 const { notifyLeadCaptured } = require('./notify');
 const { readAnswers, scoreAnswers, hotter, firstCallDue, answersLine, DUE_WORDS } = require('./enquiryScore');
 
@@ -62,7 +63,13 @@ async function findProject(projectId, projectName) {
 // Buying answers (timeline, budget, property_type, site_visit, utm_*) are optional;
 // they set Hot / Warm / Cold and how soon the first call is due.
 // Throws { status: 400 } for missing name or phone.
-async function captureLead(input, via, defaults = {}) {
+// One capture at a time, so the same buyer tapping Send twice makes one lead and
+// simultaneous enquiries are spread across agents instead of all going to one.
+function captureLead(input, via, defaults = {}) {
+  return withLock('new-lead', () => saveCapturedLead(input, via, defaults));
+}
+
+async function saveCapturedLead(input, via, defaults) {
   const name = text(input.name, 100);
   const phone = text(input.phone, 30);
   if (!name || !phoneKey(phone)) throw Object.assign(new Error('Please give a name and a valid phone number.'), { status: 400 });
@@ -77,18 +84,20 @@ async function captureLead(input, via, defaults = {}) {
     const when = new Date().toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     const line = `[${when}] Enquired again via ${via}` + (project ? ` about ${project.name}` : '') +
       (summary ? ` (${summary})` : '') + (message ? `: ${message}` : '');
-    const current = await Lead.findById(dup._id).select('notes temperature').lean();
+    const current = await Lead.findById(dup._id).select('temperature').lean();
     const now = new Date();
-    const update = {
-      notes: [current && current.notes, line].filter(Boolean).join('\n'),
+    const set = {
+      // Appended in the database, so a note written by someone else meanwhile is kept.
+      notes: { $concat: [{ $cond: [{ $gt: [{ $strLenCP: { $ifNull: ['$notes', ''] } }, 0] }, { $concat: ['$notes', '\n'] }, ''] }, line] },
       // Back to the top of the list, marked as re-enquired, so it isn't missed.
-      listed_at: now, last_enquiry_at: now, $inc: { enquiry_count: 1 }
+      listed_at: now, last_enquiry_at: now,
+      enquiry_count: { $add: [{ $ifNull: ['$enquiry_count', 0] }, 1] }
     };
     // A warmer answer this time warms the lead up; it never cools it down.
     const was = current && current.temperature;
-    if (temperature && temperature !== was && hotter(temperature, was) === temperature) update.temperature = temperature;
-    await Lead.updateOne({ _id: dup._id }, update);
-    await audit(via, 'update', 'Lead', dup._id, { repeat_enquiry: true, ...(update.temperature ? { temperature } : {}) });
+    if (temperature && temperature !== was && hotter(temperature, was) === temperature) set.temperature = temperature;
+    await Lead.updateOne({ _id: dup._id }, [{ $set: set }]);
+    await audit(via, 'update', 'Lead', dup._id, { repeat_enquiry: true, ...(set.temperature ? { temperature } : {}) });
     const fresh = await Lead.findById(dup._id).select('name phone temperature assigned_caller_id assigned_closer_id').lean();
     await scheduleFirstCall(fresh, fresh.temperature, via, true);
     await alert(fresh, true, via);

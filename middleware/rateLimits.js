@@ -1,9 +1,16 @@
 // Rate limiters. Each is created once here so every route shares the same counters.
 const rateLimit = require('express-rate-limit');
 
+// Signed-in limits count per person, not per address: a whole office usually
+// shares one internet address, and ten people must not share one allowance.
+// These limiters are mounted after requireAuth, so req.user is set.
+const perUser = req => (req.user && req.user.userId ? 'user:' + req.user.userId : req.ip);
+
+// Per address, so a shared office address needs room for everyone signing in.
+// Password guessing on one account is stopped separately by middleware/loginLockout.js.
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many login attempts. Please try again in 15 minutes.'
@@ -13,6 +20,7 @@ const loginLimiter = rateLimit({
 const chatLimiter = rateLimit({
   windowMs: 5 * 60 * 1000,
   max: 30,
+  keyGenerator: perUser,
   standardHeaders: true,
   legacyHeaders: false,
   message: { reply: "You're sending messages a bit fast \u2014 please wait a moment and try again." }
@@ -22,6 +30,7 @@ const chatLimiter = rateLimit({
 const expensiveOpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 15,
+  keyGenerator: perUser,
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many requests for this action. Please wait a few minutes and try again.'
@@ -30,7 +39,8 @@ const expensiveOpLimiter = rateLimit({
 // General authenticated app traffic — generous ceiling, well above normal multi-page navigation
 const appActionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 400,
+  max: 600,
+  keyGenerator: perUser,
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Too many requests. Please slow down and try again shortly.'

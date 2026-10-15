@@ -11,5 +11,6 @@ module.exports = {
   Team: require('./Team'),
   AuditLog: require('./AuditLog'),
   Setting: require('./Setting'),
-  Notification: require('./Notification')
+  Notification: require('./Notification'),
+  Lock: require('./Lock')
 };

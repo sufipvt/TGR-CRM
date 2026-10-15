@@ -27,6 +27,18 @@ const ADMIN_PAGES = ['settings', 'audit'];
 const SUPERADMIN_PAGES = ['users', 'teams'];
 const MANAGER_PAGES = ['sources'];
 
+// A form with a missing required field or a malformed id is the user's mistake, not
+// a crash: show it as a message on the page instead of the "Something went wrong" screen.
+function formError(e) {
+  if (e.status) return;
+  if (e.name === 'ValidationError') {
+    const fields = Object.keys(e.errors || {}).map(k => k.replace(/_id$/, '').replace(/_/g, ' '));
+    Object.assign(e, { status: 400, message: 'Please fill in: ' + (fields.join(', ') || 'the required fields') + '.' });
+  } else if (e.name === 'CastError') {
+    Object.assign(e, { status: 400, message: 'That record was not found, or a value is in the wrong format.' });
+  }
+}
+
 async function appHandler(req, res) {
   try {
     const user = req.user;
@@ -41,6 +53,7 @@ async function appHandler(req, res) {
           : await handlePostAction(req);
         return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent(msg));
       } catch (e) {
+        formError(e);
         if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
         throw e;
       }
