@@ -29,6 +29,10 @@ const MANAGER_PAGES = ['sources'];
 
 // A form with a missing required field or a malformed id is the user's mistake, not
 // a crash: show it as a message on the page instead of the "Something went wrong" screen.
+const FOLLOWUP_HISTORY_DAYS = 30;
+const FOLLOWUP_PAGE_LIMIT = 1000;
+const LEAD_PICKER_LIMIT = 1000;
+
 function formError(e) {
   if (e.status) return;
   if (e.name === 'ValidationError') {
@@ -78,34 +82,40 @@ async function appHandler(req, res) {
 
   if (page === 'dashboard') {
       const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
-      data.total_leads = await Lead.countDocuments(leadFilter);
-      data.total_bookings = await Booking.countDocuments(bookingFilter);
-      data.total_projects = await Project.countDocuments();
-      data.pending_followups = await FollowUp.countDocuments({ ...fuFilter, status: 'Pending' });
-      data.overdue_followups = await FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } });
-      const rev = await Booking.aggregate([
-        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
-        { $group: { _id: null, total: { $sum: '$sale_value' } } }
+      const bookingMatch = isAdminRole(user.role) ? [] : [{ $match: bookingFilter }];
+      // All independent, so they run together instead of one after another.
+      const [totalLeads, totalBookings, totalProjects, pending, overdue, rev, newToday, today, recent, trend, byStatus, closerPerf] = await Promise.all([
+        Lead.countDocuments(leadFilter),
+        Booking.countDocuments(bookingFilter),
+        Project.countDocuments(),
+        FollowUp.countDocuments({ ...fuFilter, status: 'Pending' }),
+        FollowUp.countDocuments({ ...fuFilter, status: 'Pending', scheduled_date: { $lt: new Date() } }),
+        Booking.aggregate([...bookingMatch, { $group: { _id: null, total: { $sum: '$sale_value' } } }]),
+        Lead.countDocuments({ ...leadFilter, created_at: { $gte: startOfToday } }),
+        loadToday({ leadFilter, fuFilter }),
+        Lead.find(leadFilter).sort({ listed_at: -1, created_at: -1 }).limit(8)
+          .populate('project_id source_id').populate({ path: 'assigned_caller_id', select: 'full_name' }),
+        Booking.aggregate([
+          ...bookingMatch,
+          { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$booking_date' } }, revenue: { $sum: '$sale_value' } } },
+          { $sort: { _id: 1 } }, { $limit: 12 }
+        ]),
+        Lead.aggregate([
+          ...(Object.keys(leadFilter).length ? [{ $match: leadFilter }] : []),
+          { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]),
+        isManager(user.role) ? Booking.aggregate([
+          ...bookingMatch,
+          { $group: { _id: '$closer_id', count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } },
+          { $lookup: { from: 'users', localField: '_id', foreignField: '_id', pipeline: [{ $project: { full_name: 1 } }], as: 'closer' } },
+          { $sort: { revenue: -1 } }
+        ]) : []
       ]);
-      data.total_revenue = rev.length ? rev[0].total : 0;
-      data.new_today = await Lead.countDocuments({ ...leadFilter, created_at: { $gte: startOfToday } });
-      data.today = await loadToday({ leadFilter, fuFilter });
-      data.recent_leads = await Lead.find(leadFilter).sort({ listed_at: -1, created_at: -1 }).limit(8).populate('project_id source_id assigned_caller_id');
-      data.booking_trend = await Booking.aggregate([
-        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
-        { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$booking_date' } }, revenue: { $sum: '$sale_value' } } },
-        { $sort: { _id: 1 } }, { $limit: 12 }
-      ]);
-      data.by_status = await Lead.aggregate([
-        ...(Object.keys(leadFilter).length ? [{ $match: leadFilter }] : []),
-        { $group: { _id: '$status', count: { $sum: 1 } } }
-      ]);
-      data.closer_perf = isManager(user.role) ? await Booking.aggregate([
-        ...(isAdminRole(user.role) ? [] : [{ $match: bookingFilter }]),
-        { $group: { _id: '$closer_id', count: { $sum: 1 }, revenue: { $sum: '$sale_value' } } },
-        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'closer' } },
-        { $sort: { revenue: -1 } }
-      ]) : [];
+      Object.assign(data, {
+        total_leads: totalLeads, total_bookings: totalBookings, total_projects: totalProjects,
+        pending_followups: pending, overdue_followups: overdue, total_revenue: rev.length ? rev[0].total : 0,
+        new_today: newToday, today, recent_leads: recent, booking_trend: trend, by_status: byStatus, closer_perf: closerPerf
+      });
     } else if (page === 'leads') {
       const { leads, list } = await loadLeadPage(Lead, leadFilter, req.query);
       data.leads = leads;
@@ -114,8 +124,16 @@ async function appHandler(req, res) {
         ? await User.find({ status: 'Active', team_id: user.team_id }).select('full_name role')
         : await User.find({ status: 'Active' }).select('full_name role');
     } else if (page === 'followups') {
-      data.followups = await FollowUp.find(fuFilter).populate({ path: 'lead_id', select: 'name phone' }).populate('assigned_to_id').sort('scheduled_date');
-      data.leads_for_fu = await Lead.find(leadFilter).select('name phone').sort('name');
+      // Every pending follow-up, but only the last 30 days of finished ones: the page
+      // used to load every follow-up ever made, which grows without end.
+      const since = new Date(); since.setDate(since.getDate() - FOLLOWUP_HISTORY_DAYS);
+      data.followups = await FollowUp.find({ $and: [fuFilter, { $or: [{ status: 'Pending' }, { scheduled_date: { $gte: since } }, { completed_date: { $gte: since } }] }] })
+        .populate({ path: 'lead_id', select: 'name phone' }).populate({ path: 'assigned_to_id', select: 'full_name' })
+        .sort('scheduled_date').limit(FOLLOWUP_PAGE_LIMIT).lean();
+      data.followup_history_days = FOLLOWUP_HISTORY_DAYS;
+      // The lead picker lists the most recently active leads, not every lead ever.
+      data.leads_for_fu = (await Lead.find(leadFilter).select('name phone').sort({ listed_at: -1, created_at: -1 }).limit(LEAD_PICKER_LIMIT).lean())
+        .sort((a, b) => a.name.localeCompare(b.name));
       data.users = await User.find({ status: 'Active', ...teamScope }).select('full_name role');
     } else if (page === 'bookings') {
       data.bookings = await Booking.find(bookingFilter)

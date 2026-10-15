@@ -122,7 +122,15 @@ async function handlePostAction(req) {
           update.disposition_reason = body.disposition_reason;
         }
       }
-      await Lead.findByIdAndUpdate(body.lead_id, update);
+      // Only save if nobody changed the lead since this form was opened; otherwise
+      // the second person to press Save would silently wipe the first one's changes.
+      const where = { _id: body.lead_id };
+      const version = Number(body.updated_at);
+      if (body.updated_at && Number.isFinite(version)) where.updated_at = new Date(version);
+      const saved = await Lead.findOneAndUpdate(where, update);
+      if (!saved) {
+        throw Object.assign(new Error('Someone else changed this lead while you were editing it. Open it again to see their changes, then make yours.'), { status: 409 });
+      }
       await audit(user.email, 'update', 'Lead', body.lead_id, { name: body.name });
       return 'Lead updated.';
     }

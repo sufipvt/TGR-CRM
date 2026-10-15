@@ -6,7 +6,7 @@
         { key: 'overdue', label: 'Overdue', cls: 'danger', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date < sot) },
         { key: 'today', label: 'Today', cls: 'primary', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date >= sot && f.scheduled_date <= eot) },
         { key: 'upcoming', label: 'Upcoming', cls: 'success', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date > eot) },
-        { key: 'done', label: 'Completed / Other', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
+        { key: 'done', label: 'Completed / Other (last ' + data.followup_history_days + ' days)', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
       ];
     %>
     <div class="d-flex justify-content-end mb-3">
@@ -38,6 +38,7 @@
                       <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit follow-up"
                         onclick='tgEditFollowup(<%= JSON.stringify({
                           _id: String(f._id), lead_id: f.lead_id ? String(f.lead_id._id) : "",
+                          lead_label: f.lead_id ? f.lead_id.name + " (" + f.lead_id.phone + ")" : "",
                           assigned_to_id: f.assigned_to_id ? String(f.assigned_to_id._id) : "",
                           scheduled_date: toDateTimeInput(f.scheduled_date),
                           type: f.type, status: f.status, outcome: f.outcome || "", notes: f.notes || ""

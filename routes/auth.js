@@ -24,7 +24,7 @@ router.post('/login', loginLimiter, async (req, res) => {
     if (lockout.isLocked(email)) {
       return res.redirect('/login?error=' + encodeURIComponent('Too many failed attempts. Try again in 15 minutes.'));
     }
-    const user = await User.findOne({ email, status: 'Active' });
+    const user = await User.findOne({ email, status: 'Active' }).select('+password');
     if (!user || !(await bcrypt.compare(password, user.password))) {
       lockout.recordFailure(email);
       return res.redirect('/login?error=' + encodeURIComponent('Invalid email or password'));

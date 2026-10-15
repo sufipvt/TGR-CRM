@@ -1,6 +1,6 @@
 // Daily follow-up email digest (sent via SendGrid, scheduled from server.js)
 const sgMail = require('@sendgrid/mail');
-const { User, FollowUp, Lead } = require('../models');
+const { User, FollowUp, Lead, Setting } = require('../models');
 const { APP_NAME } = require('./settings');
 
 if (process.env.SENDGRID_API_KEY) {
@@ -47,9 +47,25 @@ function digestHtml(title, dateStr, kpis, sections) {
     '</div></div>';
 }
 
+// True for the first caller each business day. When Render runs two copies of the
+// server (during a deploy, or scaled up), both crons fire; only one may send.
+async function claimDigestDay(day = new Date().toLocaleDateString('en-CA')) {
+  try {
+    await Setting.updateOne({ key: 'digest_sent_on', value: { $ne: day } }, { $set: { value: day } }, { upsert: true });
+    return true;
+  } catch (e) {
+    if (e.code === 11000) return false; // already claimed today: the upsert hit the existing key
+    throw e;
+  }
+}
+
 async function sendDailyDigest() {
   if (!process.env.SENDGRID_API_KEY) {
     console.log('WARN: SendGrid not configured, skipping email digest');
+    return;
+  }
+  if (!(await claimDigestDay())) {
+    console.log('Digest already sent today by another server instance, skipping');
     return;
   }
   try {
@@ -122,4 +138,4 @@ async function sendDailyDigest() {
   }
 }
 
-module.exports = { sendDailyDigest };
+module.exports = { sendDailyDigest, claimDigestDay };

@@ -164,6 +164,7 @@ function tgResetLeadForm() {
   if (form) form.reset();
   setVal('leadAction', 'add_lead');
   setVal('leadId', '');
+  setVal('leadVersion', '');
   const title = document.getElementById('leadModalTitle');
   if (title) title.textContent = 'Add Lead';
   tgToggleDispositionReason();
@@ -173,6 +174,7 @@ function tgResetLeadForm() {
 function tgEditLead(lead) {
   setVal('leadAction', 'update_lead');
   setVal('leadId', lead._id);
+  setVal('leadVersion', lead.updated_at);
   setVal('lf_name', lead.name);
   setVal('lf_phone', lead.phone);
   tgShowPhoneDuplicate(null);
@@ -341,6 +343,9 @@ function tgResetFollowupForm() {
 function tgEditFollowup(f) {
   setVal('fuAction', 'update_followup');
   setVal('fuId', f._id);
+  // The picker lists recent leads only; add this follow-up's lead if it isn't there.
+  const leadSel = document.getElementById('fu_lead');
+  if (leadSel && f.lead_id && ![...leadSel.options].some(o => o.value === f.lead_id)) leadSel.add(new Option(f.lead_label || 'Current lead', f.lead_id));
   setVal('fu_lead', f.lead_id);
   setVal('fu_type', f.type);
   setVal('fu_owner', f.assigned_to_id);

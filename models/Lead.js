@@ -30,9 +30,16 @@ const leadSchema = new Schema({
     timeline: String, budget: String, property_type: String, site_visit: String,
     utm_source: String, utm_medium: String, utm_campaign: String
   }
+}, {
+  // Set on every save and update; the edit form sends it back so a save can tell
+  // whether someone else changed the lead in the meantime.
+  timestamps: { createdAt: false, updatedAt: 'updated_at' }
 });
 
 // Leads from before listed_at existed have none; lists sort them after, by created_at.
 leadSchema.index({ listed_at: -1, created_at: -1 });
+// Dashboard and list filters by status or temperature, newest first
+leadSchema.index({ status: 1, listed_at: -1 });
+leadSchema.index({ temperature: 1, listed_at: -1 });
 
 module.exports = mongoose.model('Lead', leadSchema);
