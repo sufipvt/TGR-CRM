@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+  <title><%= kind === 'privacy' ? 'Privacy Policy' : 'Terms of Use' %> — <%= brand.company %></title>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    body { background: #f4f7fe; padding: 24px 16px; color: #1f2937; }
+    .legal { max-width: 760px; margin: 0 auto; background: #fff; border-radius: 18px; padding: 36px 32px; box-shadow: 0 12px 40px rgba(15,22,35,0.08); }
+    .legal h1 { font-size: 26px; font-weight: 700; }
+    .legal h2 { font-size: 17px; font-weight: 600; margin-top: 28px; }
+    .legal p, .legal li { font-size: 15px; line-height: 1.65; }
+    .legal-nav { font-size: 14px; }
+    @media (max-width: 576px) { .legal { padding: 24px 18px; } }
+  </style>
+</head>
+<body>
+  <main class="legal">
+    <p class="text-secondary mb-1" style="font-size:14px;"><%= brand.company %></p>
+<% if (kind === 'privacy') { %>
+    <h1>Privacy Policy</h1>
+    <p class="text-secondary" style="font-size:14px;">Last updated <%= updated %></p>
+
+    <p>This policy explains how <%= brand.company %> ("we", "us") collects and uses your personal data when you enquire about our properties, and when our staff use our sales system. We process personal data in line with India's Digital Personal Data Protection Act, 2023.</p>
+
+    <h2>What we collect</h2>
+    <ul>
+      <li><strong>When you enquire:</strong> your name, phone number and, if you give them, your email, city, the project you're interested in, budget, buying timeline, whether you'd like a site visit, and any message you write.</li>
+      <li><strong>Where your enquiry came from:</strong> the website form, ad or property portal that sent it (for example Google, Facebook or Instagram lead forms, or a portal you enquired on), and campaign tags in the link you followed.</li>
+      <li><strong>After you speak to us:</strong> notes of calls and messages, site visits, and any booking you make.</li>
+      <li><strong>For our staff:</strong> name, work email, role, and a log of what they change in the system.</li>
+    </ul>
+
+    <h2>How we use it</h2>
+    <ul>
+      <li>To call, message or email you about your enquiry and the properties that match it.</li>
+      <li>To arrange site visits and handle any booking.</li>
+      <li>To see which websites, ads and portals bring enquiries, so we can improve them.</li>
+      <li>To keep a record of our dealings with you, as the law requires.</li>
+    </ul>
+    <p>By sending an enquiry you consent to us contacting you for these purposes. You can withdraw that consent at any time (see "Your rights").</p>
+
+    <h2>Who we share it with</h2>
+    <p>Your data is seen only by our sales team and the people who manage them. We use service providers to host our systems, store data and send email; they process it only on our instructions. We don't sell your data or share it with other companies for their own marketing. Data we receive from Facebook or Instagram lead forms is used only to respond to that enquiry.</p>
+
+    <h2>How long we keep it</h2>
+    <p>We keep enquiry data while it is needed to respond to you and follow up, and booking records for as long as the law requires. You can ask us to delete your data sooner, subject to those legal requirements.</p>
+
+    <h2>How we protect it</h2>
+    <p>Our system is only reachable over encrypted connections. Each staff member signs in with their own account and sees only the enquiries they need, and every change is logged.</p>
+
+    <h2>Cookies</h2>
+    <p>Our enquiry form sets no tracking cookies. Our sales system uses one cookie to keep staff signed in.</p>
+
+    <h2>Your rights</h2>
+    <p>You can ask us to show you the data we hold about you, correct it, delete it, or stop contacting you. You can also raise a grievance with us, and if we don't resolve it, with the Data Protection Board of India.</p>
+<% } else { %>
+    <h1>Terms of Use</h1>
+    <p class="text-secondary" style="font-size:14px;">Last updated <%= updated %></p>
+
+    <p>These terms apply to our enquiry form and to our sales system. By using either, you agree to them.</p>
+
+    <h2>Enquiries</h2>
+    <ul>
+      <li>Please give your real name and a phone number you can be reached on. We may call, message or email you about your enquiry, as our <a href="/privacy">Privacy Policy</a> explains.</li>
+      <li>Information we share about projects, units, prices and availability is for guidance only and can change. It is not an offer. Only a signed agreement is binding, and project registration details are available on request.</li>
+    </ul>
+
+    <h2>Staff accounts</h2>
+    <ul>
+      <li>The sales system is for authorised staff of <%= brand.company %> only. Keep your password private and don't share your account.</li>
+      <li>Use customer data only for your work, and don't copy it out of the system except as your role allows. Changes are logged under your name.</li>
+      <li>We may suspend an account that is misused.</li>
+    </ul>
+
+    <h2>Acceptable use</h2>
+    <p>Don't try to break, overload or get around the security of the form or the system, or collect data from them with automated tools.</p>
+
+    <h2>Liability</h2>
+    <p>We work to keep the form and the system available and accurate, but we provide them as they are, and to the extent the law allows we aren't liable for losses caused by interruptions or errors.</p>
+
+    <h2>Governing law</h2>
+    <p>These terms are governed by the laws of India.</p>
+<% } %>
+
+    <h2>Contact us</h2>
+    <% if (contact.email || contact.phone || contact.address) { %>
+      <p class="mb-0"><%= brand.company %></p>
+      <% if (contact.address) { %><p class="mb-0"><%= contact.address %></p><% } %>
+      <% if (contact.email) { %><p class="mb-0">Email: <a href="mailto:<%= contact.email %>"><%= contact.email %></a></p><% } %>
+      <% if (contact.phone) { %><p class="mb-0">Phone: <%= contact.phone %></p><% } %>
+    <% } else { %>
+      <p>For any question about this <%= kind === 'privacy' ? 'policy' : 'page' %> or your data, contact our sales team.</p>
+    <% } %>
+
+    <hr class="my-4">
+    <nav class="legal-nav d-flex flex-wrap gap-3" aria-label="Legal">
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Use</a>
+    </nav>
+  </main>
+</body>
+</html>

@@ -11,6 +11,13 @@
           <div class="col-md-4"><label class="form-label" for="st_lprefix">Lead Prefix</label><input class="form-control" id="st_lprefix" name="lead_prefix" value="<%= data.settings.lead_prefix %>"></div>
           <div class="col-md-6"><label class="form-label" for="st_comm">Default Commission (%)</label><input type="number" step="0.01" class="form-control" id="st_comm" name="default_commission" value="<%= data.settings.default_commission %>"></div>
         </div>
+        <h3 class="h6 fw-semibold mt-4 mb-1">Contact details for customers</h3>
+        <p class="text-secondary mb-3" style="font-size:13px;">Shown on your public <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="/terms" target="_blank" rel="noopener">Terms of Use</a>, where customers can ask about their data.</p>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="st_cemail">Contact Email</label><input type="email" class="form-control" id="st_cemail" name="contact_email" maxlength="120" value="<%= data.settings.contact_email || '' %>"></div>
+          <div class="col-md-6"><label class="form-label" for="st_cphone">Contact Phone</label><input type="tel" class="form-control" id="st_cphone" name="contact_phone" maxlength="30" value="<%= data.settings.contact_phone || '' %>"></div>
+          <div class="col-12"><label class="form-label" for="st_caddr">Office Address</label><input class="form-control" id="st_caddr" name="company_address" maxlength="300" value="<%= data.settings.company_address || '' %>"></div>
+        </div>
         <button type="submit" class="btn btn-primary mt-4">Save Settings</button>
       </form>
     </div>

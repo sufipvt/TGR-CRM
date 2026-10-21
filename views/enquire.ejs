@@ -95,6 +95,7 @@
         <% ['utm_source', 'utm_medium', 'utm_campaign'].forEach(k => { if (values[k]) { %><input type="hidden" name="<%= k %>" value="<%= values[k] %>"><% } }) %>
         <div class="hp" aria-hidden="true"><label for="eq_website">Website</label><input id="eq_website" name="website" tabindex="-1" autocomplete="off"></div>
         <button type="submit" class="btn btn-brand w-100">Send enquiry</button>
+        <p class="text-secondary text-center mt-3 mb-0" style="font-size:12px;">By sending, you agree that we may contact you about your enquiry. See our <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a> and <a href="/terms" target="_blank" rel="noopener">Terms</a>.</p>
       </form>
     <% } %>
   </main>
