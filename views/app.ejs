@@ -43,7 +43,7 @@
 <%- include('pages/dashboard', { isManager, statusColors }) -%>
   <%# ======================= LEADS ======================= %>
   <% } else if (page === 'leads') { %>
-<%- include('pages/leads', { isManager, statusColors }) -%>
+<%- include('pages/leads', { isManager, isAdminRole, statusColors }) -%>
   <%# ======================= FOLLOW-UPS ======================= %>
   <% } else if (page === 'followups') { %>
 <%- include('pages/followups', { isManager }) -%>
