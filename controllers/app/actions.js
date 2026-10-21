@@ -504,10 +504,13 @@ async function handlePostAction(req) {
 
     
       if (!isAdminRole(user.role)) throw Object.assign(new Error('Forbidden'), { status: 403 });
-      const keys = ['company_name', 'currency', 'currency_symbol', 'tax_rate', 'booking_prefix', 'lead_prefix', 'default_commission'];
+      const keys = ['company_name', 'currency', 'currency_symbol', 'tax_rate', 'booking_prefix', 'lead_prefix', 'default_commission',
+        'contact_email', 'contact_phone', 'company_address'];
+      const email = typeof body.contact_email === 'string' ? body.contact_email.trim() : '';
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw Object.assign(new Error('Enter a valid contact email.'), { status: 400 });
       for (const key of keys) {
-        if (body[key] !== undefined) {
-          await Setting.findOneAndUpdate({ key }, { key, value: body[key] }, { upsert: true });
+        if (typeof body[key] === 'string') {
+          await Setting.findOneAndUpdate({ key }, { key, value: body[key].trim().slice(0, 300) }, { upsert: true });
         }
       }
       clearSettingsCache();

@@ -90,6 +90,7 @@ app.locals.assetVersion = (process.env.RENDER_GIT_COMMIT || String(Date.now())).
 // ROUTES: public, API, receipt, CSV import (see routes/)
 // ---------------------------------------------------------------------------
 app.use(require('./routes/pwa'));
+app.use(require('./routes/legal'));
 app.use(require('./routes/auth'));
 app.use(require('./routes/capture'));
 app.use(require('./routes/api'));

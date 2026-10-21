@@ -17,7 +17,7 @@ models/                one Mongoose model per file, all registered via models/in
 middleware/            auth (JWT cookie + 30s user cache), rate limiters, upload, input sanitizer
 services/              access (who can see/do what), reports, digest, pdf, settings, audit, assignment
 controllers/app/       GET/POST /app: index.js loads page data, actions.js = form actions, deletes.js
-routes/                auth, api (JSON), receipt, import + export (CSV), reportPdf, chat, capture, pwa (app manifest)
+routes/                auth, api (JSON), receipt, import + export (CSV), reportPdf, chat, capture, pwa (app manifest), legal (privacy, terms, /health)
 utils/                 pure helpers: format, request (clean/objIdOrNull/escapeRegex), roles, errorPage
 views/app.ejs          layout; views/partials/* shared chrome; views/pages/* one file per ?page=
 public/app.js, app.css client code (served with ?v=<deploy> cache-buster); phone.js + sw.js = installable app and call logging
