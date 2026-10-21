@@ -95,6 +95,7 @@ app.use(require('./routes/capture'));
 app.use(require('./routes/api'));
 app.use(require('./routes/receipt'));
 app.use(require('./routes/import'));
+app.use(require('./routes/export'));
 
 // ---------------------------------------------------------------------------
 // APP PAGE: GET/POST /app (see routes/app.js, controllers/app/)

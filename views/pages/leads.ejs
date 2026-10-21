@@ -43,7 +43,8 @@
               <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
             </button>
           </div>
-          <% if (isManager) { %>
+          <% if (isAdminRole) { %>
+            <a class="btn btn-outline-secondary" href="/app/export-leads<%= listQs ? '?' + listQs : '' %>" title="Download the leads matching these filters as a spreadsheet"><i class="fa-solid fa-file-export me-1" aria-hidden="true"></i>Export CSV</a>
             <button data-quick="import" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#importCsvModal"><i class="fa-solid fa-file-import me-1" aria-hidden="true"></i>Import CSV</button>
           <% } %>
           <button data-quick="new" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#leadModal" onclick="tgResetLeadForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Lead</button>
@@ -383,7 +384,7 @@
       </div>
     </div>
 
-    <% if (isManager) { %>
+    <% if (isAdminRole) { %>
     <!-- Import CSV Modal — Smart Column Mapper -->
     <div class="modal fade" id="importCsvModal" tabindex="-1" aria-labelledby="importCsvTitle" aria-hidden="true">
       <div class="modal-dialog modal-lg">
