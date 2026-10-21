@@ -1,0 +1,5 @@
+<%# Call and WhatsApp buttons for one lead. With log: true, coming back to the CRM
+    after the call asks how it went (public/phone.js, partials/call-log-modal). %>
+<% const L = phoneLinks(lead.phone); const logAttrs = typeof log !== 'undefined' && log; %>
+<% if (L.tel) { %><a class="btn btn-sm btn-outline-success" href="<%= L.tel %>" title="Call" aria-label="Call <%= lead.name %>"<% if (logAttrs) { %> data-log-call="<%= lead._id %>" data-lead-name="<%= lead.name %>" data-via="Call"<% } %>><i class="fa-solid fa-phone" aria-hidden="true"></i></a><% } %>
+<% if (L.wa) { %><a class="btn btn-sm btn-outline-success" href="<%= L.wa %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"<% if (logAttrs) { %> data-log-call="<%= lead._id %>" data-lead-name="<%= lead.name %>" data-via="WhatsApp"<% } %>><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a><% } %>

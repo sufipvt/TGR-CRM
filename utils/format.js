@@ -21,4 +21,13 @@ function formatMoneyPdf(n) {
   return 'Rs. ' + Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 }
 
-module.exports = { formatMoney, formatDate, formatDateTime, formatMoneyPdf, toDateTimeInput };
+// tel: and wa.me links from a stored phone number. A 10-digit number (or one
+// written with a leading 0) is taken as Indian and gets +91.
+function phoneLinks(phone) {
+  let digits = String(phone || '').replace(/\D/g, '');
+  if (digits.length === 11 && digits[0] === '0') digits = digits.slice(1);
+  if (digits.length === 10) digits = '91' + digits;
+  return { tel: digits ? 'tel:+' + digits : '', wa: digits ? 'https://wa.me/' + digits : '' };
+}
+
+module.exports = { formatMoney, formatDate, formatDateTime, formatMoneyPdf, toDateTimeInput, phoneLinks };

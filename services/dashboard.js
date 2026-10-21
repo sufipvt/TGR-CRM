@@ -3,6 +3,7 @@
 // sees their team's work and a Sub Team Leader only their own.
 const { Lead, FollowUp } = require('../models');
 const { CLOSED_STATUSES } = require('./assignment');
+const { phoneLinks } = require('../utils/format');
 
 const LIST_SIZE = 10;
 const LEAD_FIELDS = 'name phone status temperature last_enquiry_at assigned_caller_id created_at';
@@ -35,14 +36,6 @@ async function loadToday({ leadFilter, fuFilter }, now = new Date()) {
       'scheduled_date', [fuLead, owner])
   ]);
   return { calls, uncalled, hot, visits, now, phoneLinks };
-}
-
-// tel: and wa.me links from a stored phone number. WhatsApp assumes an Indian
-// number when it has 10 digits, as the Leads page does.
-function phoneLinks(phone) {
-  const digits = String(phone || '').replace(/\D/g, '');
-  const wa = digits.length === 10 ? '91' + digits : digits;
-  return { tel: digits ? 'tel:+' + (digits.length === 10 ? '91' + digits : digits) : '', wa: digits ? 'https://wa.me/' + wa : '' };
 }
 
 module.exports = { loadToday, phoneLinks, LIST_SIZE };

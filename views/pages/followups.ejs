@@ -19,19 +19,20 @@
           <p class="text-secondary mb-0" style="font-size:14px;">Nothing here.</p>
         <% } else { %>
           <div class="table-responsive">
-            <table class="table tg-table align-middle mb-0">
+            <table class="table tg-table tg-stack align-middle mb-0">
               <thead><tr><th>Lead</th><th>Type</th><th>Owner</th><th>When</th><th>Notes</th><th>Outcome</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 <% bucket.items.forEach(f => { %>
                   <tr>
-                    <td class="fw-medium"><%= f.lead_id ? f.lead_id.name : '—' %><div class="text-secondary" style="font-size:12px;"><%= f.lead_id ? f.lead_id.phone : '' %></div></td>
-                    <td><span class="badge text-bg-light border"><%= f.type %></span></td>
-                    <td><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
-                    <td style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
-                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
-                    <td class="text-secondary" style="font-size:13px;max-width:180px;"><% if (f.visit_outcome) { %><span class="badge text-bg-<%= f.visit_outcome === 'Interested' ? 'success' : (f.visit_outcome === 'No show' || f.visit_outcome === 'Not interested' ? 'danger' : 'secondary') %> me-1"><%= f.visit_outcome %></span><% } %><%= f.outcome || (f.visit_outcome ? '' : '—') %></td>
-                    <td><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
-                    <td class="text-nowrap">
+                    <td class="tg-c-lead fw-medium"><%= f.lead_id ? f.lead_id.name : '—' %><div class="text-secondary" style="font-size:12px;"><%= f.lead_id ? f.lead_id.phone : '' %></div></td>
+                    <td class="tg-c-type"><span class="badge text-bg-light border"><%= f.type %></span></td>
+                    <td class="tg-c-owner<%= isManager ? '' : ' tg-m-hide' %>"><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
+                    <td class="tg-c-when" style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
+                    <td class="tg-c-notes<%= f.notes ? '' : ' tg-m-hide' %> text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
+                    <td class="tg-c-outcome<%= f.outcome || f.visit_outcome ? '' : ' tg-m-hide' %> text-secondary" style="font-size:13px;max-width:180px;"><% if (f.visit_outcome) { %><span class="badge text-bg-<%= f.visit_outcome === 'Interested' ? 'success' : (f.visit_outcome === 'No show' || f.visit_outcome === 'Not interested' ? 'danger' : 'secondary') %> me-1"><%= f.visit_outcome %></span><% } %><%= f.outcome || (f.visit_outcome ? '' : '—') %></td>
+                    <td class="tg-c-status"><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
+                    <td class="tg-c-actions text-nowrap">
+                      <% if (f.lead_id && f.status === 'Pending') { %><%- include('../partials/call-buttons', { lead: f.lead_id, log: true }) -%><% } %>
                       <% if (f.status === 'Pending') { %>
                         <button class="btn btn-sm btn-outline-success" title="Mark done" onclick='tgCompleteFollowup(<%= JSON.stringify(String(f._id)) %>, <%= JSON.stringify(f.type) %>)'>Done</button>
                       <% } %>

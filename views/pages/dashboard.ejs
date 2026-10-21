@@ -30,9 +30,8 @@
       <% }) %>
     </div>
 
-    <% function contactButtons(lead) { const L = T.phoneLinks(lead.phone); %>
-      <% if (L.tel) { %><a class="btn btn-sm btn-outline-success" href="<%= L.tel %>" title="Call" aria-label="Call <%= lead.name %>"><i class="fa-solid fa-phone" aria-hidden="true"></i></a><% } %>
-      <% if (L.wa) { %><a class="btn btn-sm btn-outline-success" href="<%= L.wa %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>" target="_blank" rel="noopener" title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a><% } %>
+    <% function contactButtons(lead) { %>
+      <%- include('../partials/call-buttons', { lead, log: true }) -%>
       <a class="btn btn-sm btn-outline-secondary" href="/app?page=leads&q=<%= encodeURIComponent(lead.phone) %>" title="Open lead" aria-label="Open <%= lead.name %>"><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
     <% } %>
     <% function tempBadge(lead) { %>

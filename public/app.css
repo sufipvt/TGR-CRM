@@ -540,3 +540,38 @@ a.tg-kpi-link:hover { color: #fff; transform: translateY(-2px); box-shadow: 0 8p
 @media (max-width: 575.98px) {
   .tg-today-row { flex-wrap: wrap; }
 }
+
+/* ---------------- Phone layout ----------------
+   Wide tables (Leads, Follow-ups) become one card per row on phones, with the
+   name first and the Call / WhatsApp buttons big enough to tap. */
+@media (max-width: 767.98px) {
+  .tg-stack thead { display: none; }
+  .tg-stack, .tg-stack tbody { display: block; width: 100%; }
+  .tg-stack tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 12px 2px; border-bottom: 1px solid var(--bs-border-color); }
+  .tg-stack td { display: block; border: 0; padding: 0; background: transparent; box-shadow: none; }
+  .tg-stack td[colspan] { flex-basis: 100%; }
+  .tg-stack .tg-m-hide { display: none; }
+  .tg-stack .tg-c-check { order: 0; }
+  .tg-stack .tg-c-lead { order: 1; flex: 1 1 55%; min-width: 0; }
+  .tg-stack .tg-c-temp, .tg-stack .tg-c-type { order: 2; }
+  .tg-stack .tg-c-status { order: 3; }
+  .tg-stack .tg-c-phone, .tg-stack .tg-c-project, .tg-stack .tg-c-caller,
+  .tg-stack .tg-c-when, .tg-stack .tg-c-owner { order: 4; font-size: 13px; color: var(--bs-secondary-color); }
+  .tg-stack .tg-c-owner { order: 5; }
+  .tg-stack .tg-c-project::before, .tg-stack .tg-c-caller::before, .tg-stack .tg-c-owner::before { content: "· "; }
+  .tg-stack .tg-c-notes, .tg-stack .tg-c-outcome { order: 6; flex-basis: 100%; max-width: none !important; }
+  .tg-stack .tg-c-actions { order: 9; flex-basis: 100%; white-space: normal; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 6px; }
+  .tg-stack .tg-c-actions form { display: inline-flex !important; }
+  /* Thumb-sized buttons */
+  .tg-stack .tg-c-actions .btn-sm, #todayPanel .tg-today-row .btn-sm { min-width: 42px; min-height: 42px; display: inline-flex; align-items: center; justify-content: center; }
+  /* Topbar: keep the name, drop the role badge so nothing runs off the screen */
+  .tg-role-badge, .tg-welcome { display: none !important; }
+  .tg-profile { gap: 8px; }
+  .tg-profile-pill { padding: 6px 10px; max-width: 120px; }
+  .tg-profile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* "How did the call go?" outcome buttons */
+.tg-outcome-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.tg-outcome-grid .btn { min-height: 44px; }
+.tg-install-btn[hidden] { display: none !important; }
