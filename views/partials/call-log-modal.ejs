@@ -1,0 +1,34 @@
+<%# Shown when someone comes back to the CRM after tapping Call or WhatsApp on a lead
+    (public/phone.js). One tap records how it went; a call-back time adds a follow-up. %>
+<div class="modal fade" id="callLogModal" tabindex="-1" aria-labelledby="callLogTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="POST" action="/app?page=<%= page %>" id="callLogForm">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="callLogTitle">How did the call go?</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" name="action" value="log_call">
+          <input type="hidden" name="lead_id" id="callLogLead">
+          <input type="hidden" name="via" id="callLogVia" value="Call">
+          <p class="fw-medium mb-2" id="callLogName"></p>
+          <div class="tg-outcome-grid mb-3" role="radiogroup" aria-label="Outcome">
+            <% CONTACT_OUTCOMES.forEach((o, i) => { %>
+              <input type="radio" class="btn-check" name="contact_outcome" id="callOutcome<%= i %>" value="<%= o %>" required>
+              <label class="btn btn-outline-<%= o === 'Interested' ? 'success' : (o === 'Requested Callback' ? 'primary' : (o === 'Not Interested' ? 'danger' : 'secondary')) %>" for="callOutcome<%= i %>"><%= o %></label>
+            <% }) %>
+          </div>
+          <label class="form-label" for="callLogNote">Note <span class="text-secondary">(optional)</span></label>
+          <textarea class="form-control mb-3" id="callLogNote" name="note" rows="2" maxlength="500" placeholder="What did they say?"></textarea>
+          <label class="form-label" for="callLogNext">Call again at <span class="text-secondary">(optional)</span></label>
+          <input type="datetime-local" class="form-control" id="callLogNext" name="next_at">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Skip</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

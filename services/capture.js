@@ -90,7 +90,7 @@ async function saveCapturedLead(input, via, defaults) {
       // Appended in the database, so a note written by someone else meanwhile is kept.
       notes: { $concat: [{ $cond: [{ $gt: [{ $strLenCP: { $ifNull: ['$notes', ''] } }, 0] }, { $concat: ['$notes', '\n'] }, ''] }, line] },
       // Back to the top of the list, marked as re-enquired, so it isn't missed.
-      listed_at: now, last_enquiry_at: now,
+      listed_at: now, last_enquiry_at: now, updated_at: now,
       enquiry_count: { $add: [{ $ifNull: ['$enquiry_count', 0] }, 1] }
     };
     // A warmer answer this time warms the lead up; it never cools it down.

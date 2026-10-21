@@ -7,7 +7,7 @@ const {
 const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team, Setting
 } = require('../../models');
-const { formatMoney } = require('../../utils/format');
+const { formatMoney, formatDateTime } = require('../../utils/format');
 const { cleanBody, objIdOrNull } = require('../../utils/request');
 const { isSuperAdmin, isAdminRole, isTeamLeader, isManager } = require('../../utils/roles');
 const { audit } = require('../../services/audit');
@@ -168,6 +168,38 @@ async function handlePostAction(req) {
       await Lead.findByIdAndUpdate(body.lead_id, { contact_outcome: body.contact_outcome });
       await audit(user.email, 'update', 'Lead', body.lead_id, { contact_outcome: body.contact_outcome });
       return 'Logged: ' + body.contact_outcome + '.';
+    }
+    case 'log_call': {
+      // Asked after tapping Call or WhatsApp on a lead (partials/call-log-modal.ejs).
+      if (!CONTACT_OUTCOMES.includes(body.contact_outcome)) throw Object.assign(new Error('Pick how the call went.'), { status: 400 });
+      if (!(await canEditLead(user, body.lead_id))) throw forbidden();
+      const via = body.via === 'WhatsApp' ? 'WhatsApp' : 'Call';
+      const note = String(body.note || '').slice(0, 500);
+      const now = new Date();
+      const nextAt = body.next_at ? new Date(body.next_at) : null;
+      if (nextAt && (isNaN(nextAt) || nextAt <= now)) throw Object.assign(new Error('Pick a call-back time in the future.'), { status: 400 });
+      const stamp = now.toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+      const line = `[${stamp}] ${via} by ${user.name || user.email}: ${body.contact_outcome}` + (note ? ` (${note})` : '');
+      await Lead.updateOne({ _id: body.lead_id }, [{ $set: {
+        contact_outcome: body.contact_outcome,
+        // Appended in the database, so a note someone else wrote meanwhile is kept.
+        notes: { $concat: [{ $cond: [{ $gt: [{ $strLenCP: { $ifNull: ['$notes', ''] } }, 0] }, { $concat: ['$notes', '\n'] }, ''] }, line] },
+        updated_at: '$$NOW'
+      } }]);
+      // The call or WhatsApp follow-up this person had due for the lead is now done.
+      const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
+      const done = await FollowUp.findOneAndUpdate(
+        { lead_id: body.lead_id, assigned_to_id: user.userId, status: 'Pending', type: { $in: ['Call', 'WhatsApp'] }, scheduled_date: { $lte: endOfToday } },
+        { status: 'Completed', completed_date: now, outcome: body.contact_outcome + (note ? ': ' + note : '') },
+        { sort: { scheduled_date: 1 } }
+      );
+      let next = null;
+      if (nextAt) {
+        next = await FollowUp.create({ lead_id: body.lead_id, assigned_to_id: user.userId, scheduled_date: nextAt, type: 'Call', notes: 'Call back (' + body.contact_outcome + ')' + (note ? ': ' + note : '') });
+        await audit(user.email, 'create', 'FollowUp', next._id, { lead_id: String(body.lead_id), via: 'call log' });
+      }
+      await audit(user.email, 'update', 'Lead', body.lead_id, { contact_outcome: body.contact_outcome, via, followup_done: done ? String(done._id) : undefined });
+      return `${via} logged: ${body.contact_outcome}.` + (done ? ' Follow-up marked done.' : '') + (next ? ' Next call ' + formatDateTime(next.scheduled_date) + '.' : '');
     }
     case 'qualify_lead': {
       if (!(await canEditLead(user, body.lead_id))) throw Object.assign(new Error('Forbidden'), { status: 403 });

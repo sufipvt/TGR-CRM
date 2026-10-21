@@ -31,7 +31,8 @@ process.on('unhandledRejection', (reason) => {
 // MODELS + HELPERS USED HERE
 // ---------------------------------------------------------------------------
 const { User } = require('./models');
-const { formatMoney, formatDate, formatDateTime, toDateTimeInput } = require('./utils/format');
+const { formatMoney, formatDate, formatDateTime, toDateTimeInput, phoneLinks } = require('./utils/format');
+const { CONTACT_OUTCOMES } = require('./config/constants');
 const { sendErrorPage } = require('./utils/errorPage');
 const { logError } = require('./middleware/requestLog');
 const { sendDailyDigest } = require('./services/digest');
@@ -80,12 +81,15 @@ app.locals.formatMoney = formatMoney;
 app.locals.formatDate = formatDate;
 app.locals.formatDateTime = formatDateTime;
 app.locals.toDateTimeInput = toDateTimeInput;
+app.locals.phoneLinks = phoneLinks;
+app.locals.CONTACT_OUTCOMES = CONTACT_OUTCOMES;
 // Changes on every deploy so browsers fetch the new app.js/app.css instead of a cached copy.
 app.locals.assetVersion = (process.env.RENDER_GIT_COMMIT || String(Date.now())).slice(0, 12);
 
 // ---------------------------------------------------------------------------
 // ROUTES: public, API, receipt, CSV import (see routes/)
 // ---------------------------------------------------------------------------
+app.use(require('./routes/pwa'));
 app.use(require('./routes/auth'));
 app.use(require('./routes/capture'));
 app.use(require('./routes/api'));

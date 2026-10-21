@@ -70,7 +70,7 @@
         <button type="button" class="btn btn-sm btn-link" onclick="tgClearBulk()">Clear</button>
       </form>
       <div class="table-responsive">
-        <table class="table tg-table align-middle" id="leadsTable">
+        <table class="table tg-table tg-stack align-middle" id="leadsTable">
           <thead>
             <tr><th><input type="checkbox" class="form-check-input" id="bulkAll" aria-label="Select all leads on this page" onchange="tgBulkSelectAll(this.checked)"></th><th>Lead</th><th>Phone</th><th>Source</th><th>Project</th><th>Caller</th><th>Closer</th><th>Temp</th><th>Status</th><th>Created</th><th>Actions</th></tr>
           </thead>
@@ -85,37 +85,35 @@
              <tr data-status="<%= lead.status %>" data-source="<%= lead.source_id ? lead.source_id.name : '' %>" data-project="<%= lead.project_id ? lead.project_id.name : '' %>"
                   data-temperature="<%= lead.temperature || '' %>"
                   data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
-                <td><% if (canEdit) { %><input type="checkbox" class="form-check-input tg-bulk" form="bulkLeadForm" name="lead_ids" value="<%= lead._id %>" aria-label="Select <%= lead.name %>" onchange="tgBulkChanged()"><% } %></td>
-                <td>
+                <td class="tg-c-check"><% if (canEdit) { %><input type="checkbox" class="form-check-input tg-bulk" form="bulkLeadForm" name="lead_ids" value="<%= lead._id %>" aria-label="Select <%= lead.name %>" onchange="tgBulkChanged()"><% } %></td>
+                <td class="tg-c-lead">
                   <div class="fw-medium"><%= lead.name %></div>
                   <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
                   <% if (lead.last_enquiry_at) { %>
                     <span class="badge text-bg-warning" title="Last enquired <%= formatDateTime(lead.last_enquiry_at) %>">Re-enquired<%= lead.enquiry_count > 1 ? ' ×' + lead.enquiry_count : '' %></span>
                   <% } %>
                 </td>
-                <td>
+                <td class="tg-c-phone">
                   <%= lead.phone %>
                   <% if (['Not Reachable','Switched Off','Call Rejected','Invalid Number'].includes(lead.contact_outcome)) { %>
                     <i class="fa-solid fa-phone-slash text-danger ms-1" title="<%= lead.contact_outcome %>" aria-hidden="true"></i>
                   <% } %>
                 </td>
       
-                <td><%= lead.source_id ? lead.source_id.name : '—' %></td>
-                <td><%= lead.project_id ? lead.project_id.name : '—' %></td>
-                <td><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
-               <td><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
-                <td>
+                <td class="tg-c-source tg-m-hide"><%= lead.source_id ? lead.source_id.name : '—' %></td>
+                <td class="tg-c-project"><%= lead.project_id ? lead.project_id.name : '—' %></td>
+                <td class="tg-c-caller"><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
+               <td class="tg-c-closer tg-m-hide"><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
+                <td class="tg-c-temp">
                   <% if (lead.temperature === 'Hot') { %><span class="badge text-bg-danger">🔥 Hot</span><% } %>
                   <% if (lead.temperature === 'Warm') { %><span class="badge text-bg-warning">☀️ Warm</span><% } %>
                   <% if (lead.temperature === 'Cold') { %><span class="badge text-bg-info">❄️ Cold</span><% } %>
                   <% if (!lead.temperature) { %><span class="text-secondary">—</span><% } %>
                 </td>
-                <td><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
-                <td class="text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
-                <td class="text-nowrap">
-                  <a class="btn btn-sm btn-outline-success" target="_blank" rel="noopener"
-                     href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>"
-                     title="WhatsApp" aria-label="WhatsApp <%= lead.name %>"><i class="fa-brands fa-whatsapp" aria-hidden="true"></i></a>
+                <td class="tg-c-status"><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
+                <td class="tg-c-date tg-m-hide text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
+                <td class="tg-c-actions text-nowrap">
+                  <%- include('../partials/call-buttons', { lead, log: canEdit }) -%>
                   <button class="btn btn-sm btn-outline-secondary" onclick='tgShowTimeline("<%= lead._id %>", <%= JSON.stringify(lead.name) %>)' title="Timeline" aria-label="View timeline"><i class="fa-solid fa-timeline" aria-hidden="true"></i></button>
                   <% if (canEdit) { %>
                     <button type="button" class="btn btn-sm btn-outline-danger" title="Not Interested"
@@ -241,7 +239,7 @@
                         </button>
                         <a class="btn btn-sm py-0 px-1 btn-outline-success" target="_blank" rel="noopener"
                            title="WhatsApp" aria-label="WhatsApp"
-                           href="https://wa.me/91<%= lead.phone.replace(/\D/g,'').slice(-10) %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>">
+                           href="<%= phoneLinks(lead.phone).wa %>?text=<%= encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') %>">
                           <i class="fa-brands fa-whatsapp" style="font-size:10px;" aria-hidden="true"></i>
                         </a>
                       </div>
