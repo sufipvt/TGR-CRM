@@ -1,0 +1,130 @@
+/* TrueGrowth CRM — redesign layer, loaded after app.css.
+   Dense, list-first, light. Colour roles live in :root; components use the
+   variables, never raw hex, so a client's brand can change them in one place. */
+
+:root {
+  --sidebar-bg:     #0f1623;
+  --sidebar-ink:    #c7cdd8;
+  --sidebar-muted:  #9aa3b2;
+  --sidebar-hover:  #1a56db;
+  --brand:          #1a56db;
+  --brand-dark:     #1e429f;
+  --brand-soft:     #e1eaff;
+  --accent:         #ff8800;
+  --bg:             #f4f6fb;
+  --panel:          #ffffff;
+  --panel-head:     #f8f9fc;
+  --border:         #e4e7ee;
+  --border-input:   #8a93a3;
+  --ink:            #111827;
+  --ink-2:          #374151;
+  --ink-soft:       #5b6475;
+  --card-radius:    12px;
+  --sidebar-w:      232px;
+  --topbar-h:       60px;
+  --bottomnav-h:    64px;
+}
+
+body { font-size: 14px; }
+
+/* ---------------- Sidebar ---------------- */
+.tg-sidebar-brand { padding: 18px 16px 14px; gap: 10px; }
+.tg-logo { width: 34px; height: 34px; border-radius: 8px; background: var(--accent); color: var(--ink); font-size: 14px; }
+.tg-brand-name { font-size: 15px; font-weight: 600; }
+.tg-brand-sub { color: var(--sidebar-muted); font-size: 12px; }
+.tg-nav { padding: 10px; }
+.tg-nav-link { padding: 9px 12px; border-radius: 8px; color: var(--sidebar-ink); gap: 10px; }
+.tg-nav-link:hover { background: rgba(255,255,255,0.07); color: #fff; }
+.tg-nav-link.active { background: var(--brand); color: #fff; }
+.tg-nav-link:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* ---------------- Topbar ---------------- */
+.tg-topbar { gap: 16px; }
+.tg-page-title { font-size: 18px; white-space: nowrap; }
+.tg-topsearch {
+  flex: 1; max-width: 440px;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg); border: 1px solid #d5dae3; border-radius: 8px;
+  padding: 0 12px; height: 38px; margin: 0;
+}
+.tg-topsearch:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px #c7d7fe; }
+.tg-topsearch i { color: var(--ink-soft); font-size: 14px; }
+.tg-topsearch input { border: 0; background: transparent; outline: none; flex: 1; min-width: 0; font: inherit; color: var(--ink); }
+.tg-profile { margin-left: auto; }
+.tg-profile-pill { border-radius: 8px; background: var(--panel); }
+.tg-role-badge { background: var(--brand-soft) !important; color: var(--brand-dark); font-weight: 600; }
+.tg-theme-toggle { border-color: var(--border); }
+
+/* ---------------- Panels, cards ---------------- */
+.tg-panel { border-radius: var(--card-radius); }
+.tg-panel-title { font-size: 16px; font-weight: 600; }
+
+/* KPI tiles: white cards with a coloured number instead of gradient blocks */
+.tg-kpi, a.tg-kpi-link { background: var(--panel); color: var(--ink); border: 1px solid var(--border); min-height: 96px; padding: 16px; }
+a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.08); }
+.tg-kpi-label { font-size: 13px; color: var(--ink-soft); opacity: 1; }
+.tg-kpi-value { font-size: 24px; overflow-wrap: anywhere; line-height: 1.2; }
+.tg-kpi-sub { font-size: 13px; color: var(--ink-2); opacity: 1; }
+.tg-kpi-icon { opacity: 0.14; color: var(--brand); }
+.tg-kpi-blue   .tg-kpi-value { color: var(--brand-dark); }
+.tg-kpi-teal   .tg-kpi-value { color: #0f5e56; }
+.tg-kpi-indigo .tg-kpi-value { color: #3730a3; }
+.tg-kpi-red    .tg-kpi-value { color: #b91c1c; }
+.tg-kpi-orange .tg-kpi-value { color: #b45309; }
+.tg-kpi-green  .tg-kpi-value { color: #065f46; }
+.tg-kpi-red .tg-kpi-icon { color: #b91c1c; }
+
+/* ---------------- Tables ---------------- */
+.tg-table { --bs-table-bg: transparent; }
+.tg-table thead th { background: var(--panel-head); font-size: 12px; letter-spacing: 0.04em; color: var(--ink-soft); padding-top: 10px; padding-bottom: 10px; }
+.tg-table td { border-color: #eef0f4; padding-top: 11px; padding-bottom: 11px; }
+.tg-table tbody tr:hover { background: #f5f8ff; }
+
+/* ---------------- Forms and buttons ---------------- */
+.form-control, .form-select { border-color: var(--border-input); border-radius: 8px; }
+.form-control:focus, .form-select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px #c7d7fe; }
+.btn { border-radius: 8px; font-weight: 500; }
+.btn-outline-secondary { color: var(--ink-2); border-color: #d5dae3; background: var(--panel); }
+.btn-outline-secondary:hover { color: var(--ink); background: var(--bg); border-color: var(--border-input); }
+.badge { font-weight: 600; }
+
+/* ---------------- Phone bottom tab bar ---------------- */
+.tg-bottomnav { display: none; }
+@media (max-width: 767.98px) {
+  body { font-size: 15px; }
+  .tg-topsearch { display: none; }
+  .tg-content { padding-bottom: calc(var(--bottomnav-h) + 24px); }
+  .tg-bottomnav {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1025;
+    height: calc(var(--bottomnav-h) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--panel); border-top: 1px solid var(--border);
+  }
+  .tg-bottomnav a, .tg-bottomnav button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border: 0; background: transparent; color: var(--ink-soft);
+    font-size: 12px; font-weight: 600; text-decoration: none; min-height: 44px;
+  }
+  .tg-bottomnav i { font-size: 18px; }
+  .tg-bottomnav .active { color: var(--brand); }
+  #tgChatBubble { bottom: calc(var(--bottomnav-h) + 16px) !important; }
+}
+
+/* ---------------- Dark mode for the new pieces ---------------- */
+[data-bs-theme="dark"] .tg-topsearch { background: #273449; border-color: #334155; }
+[data-bs-theme="dark"] .tg-topsearch input { color: #e2e8f0; }
+[data-bs-theme="dark"] .tg-topsearch i { color: #94a3b8; }
+[data-bs-theme="dark"] .tg-kpi,
+[data-bs-theme="dark"] a.tg-kpi-link { background: #1e293b; border-color: #334155; color: #e2e8f0; }
+[data-bs-theme="dark"] .tg-kpi-label { color: #94a3b8; }
+[data-bs-theme="dark"] .tg-kpi-sub { color: #cbd5e1; }
+[data-bs-theme="dark"] .tg-kpi .tg-kpi-value { color: #f1f5f9; }
+[data-bs-theme="dark"] .tg-kpi-red .tg-kpi-value { color: #fca5a5; }
+[data-bs-theme="dark"] .tg-table thead th { background: #273449; }
+[data-bs-theme="dark"] .tg-table td { border-color: #334155; }
+[data-bs-theme="dark"] .tg-role-badge { background: #1e3a8a !important; color: #dbeafe; }
+[data-bs-theme="dark"] .tg-profile-pill { background: #1e293b; }
+[data-bs-theme="dark"] .tg-bottomnav { background: #1e293b; border-color: #334155; }
+[data-bs-theme="dark"] .tg-bottomnav a, [data-bs-theme="dark"] .tg-bottomnav button { color: #94a3b8; }
+[data-bs-theme="dark"] .tg-bottomnav .active { color: #93b4f5; }
