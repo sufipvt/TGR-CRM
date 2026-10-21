@@ -37,7 +37,9 @@ test('search and filters run on the server', async () => {
   assert.ok(byPhone.includes('Bina Rao'));
   const qualified = await page(f.admin, '&status=Qualified');
   assert.match(qualified, /of 5 leads/);
-  assert.ok(qualified.includes('value="Qualified" selected'), 'chosen filter shown back');
+  assert.match(qualified, /class="active"[^>]*>Qualified <span class="tg-tab-count">5</, 'chosen status tab shown active, with its count');
+  assert.match(qualified, />All <span class="tg-tab-count">62</, 'All tab counts every status');
+  assert.match(byName, />New <span class="tg-tab-count">1</, 'tab counts follow the search');
   const newOnly = await page(f.admin, '&status=New');
   assert.ok(newOnly.includes('status=New&amp;p=2'), 'filters kept in the Next link');
   const regex = await page(f.admin, '&q=.*');
@@ -49,6 +51,7 @@ test('search and filters run on the server', async () => {
 test('a Team Leader only pages through their own team', async () => {
   const tl = await page(f.tlA, '');
   assert.match(tl, /of 61 leads/);
+  assert.match(tl, />All <span class="tg-tab-count">61</, 'tab counts keep team scoping');
   assert.ok(!(await page(f.tlA, '&q=Bina')).includes('Bina Rao'), 'other team lead never found by search');
   const sub = await page(f.subB, '');
   assert.match(sub, /of 1 leads/);
