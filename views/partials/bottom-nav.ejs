@@ -1,0 +1,7 @@
+<!-- PHONE TAB BAR (shown under 768px) -->
+<nav class="tg-bottomnav" aria-label="Quick navigation">
+  <a href="/app?page=dashboard" class="<%= page === 'dashboard' ? 'active' : '' %>" <%= page === 'dashboard' ? 'aria-current=page' : '' %>><i class="fa-solid fa-gauge-high" aria-hidden="true"></i>Home</a>
+  <a href="/app?page=leads" class="<%= page === 'leads' ? 'active' : '' %>" <%= page === 'leads' ? 'aria-current=page' : '' %>><i class="fa-solid fa-user-group" aria-hidden="true"></i>Leads</a>
+  <a href="/app?page=followups" class="<%= page === 'followups' ? 'active' : '' %>" <%= page === 'followups' ? 'aria-current=page' : '' %>><i class="fa-solid fa-bell" aria-hidden="true"></i>Follow-ups</a>
+  <button type="button" onclick="openSidebar()" aria-label="Open full menu"><i class="fa-solid fa-bars" aria-hidden="true"></i>Menu</button>
+</nav>

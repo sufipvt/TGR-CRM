@@ -4,6 +4,11 @@
     <i class="fa-solid fa-bars"></i>
   </button>
   <h1 class="tg-page-title"><%= pageTitles[page] || 'Dashboard' %></h1>
+  <form class="tg-topsearch" method="GET" action="/app" role="search">
+    <input type="hidden" name="page" value="leads">
+    <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+    <input type="search" name="q" placeholder="Search leads by name, phone or email" aria-label="Search leads">
+  </form>
   <div class="tg-profile">
     <button class="tg-theme-toggle" id="tgThemeToggle" onclick="tgToggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
       <i class="fa-solid fa-moon" id="tgThemeIcon" aria-hidden="true"></i>
