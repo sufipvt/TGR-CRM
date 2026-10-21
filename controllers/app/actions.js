@@ -521,12 +521,19 @@ async function handlePostAction(req) {
       if (!isAdminRole(user.role)) throw forbidden();
       const cfg = await captureSettings();
       const source = objIdOrNull(body.capture_source_id);
-      await setSetting('capture_form_enabled', body.capture_form_enabled === '1' ? '1' : '');
-      await setSetting('capture_source_id', source ? String(source) : '');
-      await setSetting('capture_webhook_enabled', body.capture_webhook_enabled === '1' ? '1' : '');
-      if (body.capture_webhook_enabled === '1' && !cfg.webhookKey) await setSetting('capture_webhook_key', newWebhookKey());
+      // The Integrations page saves the form and the webhook from separate tiles;
+      // each tile says which part it carries, so the other part is left as it is.
+      const both = !body.section;
+      if (both || body.section === 'form') {
+        await setSetting('capture_form_enabled', body.capture_form_enabled === '1' ? '1' : '');
+        await setSetting('capture_source_id', source ? String(source) : '');
+      }
+      if (both || body.section === 'webhook') {
+        await setSetting('capture_webhook_enabled', body.capture_webhook_enabled === '1' ? '1' : '');
+        if (body.capture_webhook_enabled === '1' && !cfg.webhookKey) await setSetting('capture_webhook_key', newWebhookKey());
+      }
       await audit(user.email, 'update', 'Settings', 'lead_capture', {
-        form: body.capture_form_enabled === '1', webhook: body.capture_webhook_enabled === '1'
+        section: body.section || 'both', form: body.capture_form_enabled === '1', webhook: body.capture_webhook_enabled === '1'
       });
       return 'Lead capture settings saved.';
     }

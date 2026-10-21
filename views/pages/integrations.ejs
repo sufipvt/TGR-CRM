@@ -1,0 +1,217 @@
+    <%
+      const STATUS = {
+        on: { label: 'Connected', cls: 'text-bg-success' },
+        attention: { label: 'Needs attention', cls: 'text-bg-warning' },
+        off: { label: 'Not connected', cls: 'text-bg-light border' }
+      };
+      const RESULT = {
+        new: { label: 'New lead', cls: 'text-bg-success' },
+        repeat: { label: 'Repeat', cls: 'text-bg-info' },
+        test: { label: 'Test', cls: 'text-bg-light border' },
+        refused: { label: 'Refused', cls: 'text-bg-warning' },
+        error: { label: 'Error', cls: 'text-bg-danger' }
+      };
+      const formUrl = data.base_url + '/enquire';
+      const formStatus = data.capture.formEnabled ? 'on' : 'off';
+      const hookStatus = data.capture.webhookEnabled ? 'on' : 'off';
+    %>
+    <div class="tg-panel">
+      <h2 class="tg-panel-title mb-1">Integrations</h2>
+      <p class="text-secondary mb-0" style="font-size:14px;">Connect the places your leads come from. Each one has its own link and secret key, so you can switch one off or change its key without touching the others. Leads are tagged with their source, assigned automatically, and a phone number already in the CRM adds a note to that lead instead of a second lead.</p>
+    </div>
+
+    <div class="tg-int-grid mt-3">
+      <button type="button" class="tg-int-tile" data-bs-toggle="modal" data-bs-target="#int_website">
+        <span class="tg-int-logo" style="background:#1a56db;"><i class="fa-solid fa-globe" aria-hidden="true"></i></span>
+        <span class="tg-int-name">Website form</span>
+        <span class="tg-int-blurb">A page in your company's name where buyers leave their details.</span>
+        <span class="badge <%= STATUS[formStatus].cls %>"><%= STATUS[formStatus].label %></span>
+      </button>
+      <% data.tiles.forEach(t => { %>
+        <button type="button" class="tg-int-tile" data-bs-toggle="modal" data-bs-target="#int_<%= t.key %>">
+          <span class="tg-int-logo" style="background:<%= t.color %>;"><% if (t.icon) { %><i class="<%= t.icon %>" aria-hidden="true"></i><% } else { %><%= t.initials %><% } %></span>
+          <span class="tg-int-name"><%= t.name %></span>
+          <span class="tg-int-blurb"><%= t.blurb %></span>
+          <span class="badge <%= STATUS[t.status].cls %>"><%= STATUS[t.status].label %><%= t.leads7d ? ' · ' + t.leads7d + ' this week' : '' %></span>
+        </button>
+      <% }) %>
+      <button type="button" class="tg-int-tile" data-bs-toggle="modal" data-bs-target="#int_webhook">
+        <span class="tg-int-logo" style="background:#4b5563;"><i class="fa-solid fa-code" aria-hidden="true"></i></span>
+        <span class="tg-int-name">Other tools</span>
+        <span class="tg-int-blurb">One general link for anything else that can send a web request.</span>
+        <span class="badge <%= STATUS[hookStatus].cls %>"><%= STATUS[hookStatus].label %></span>
+      </button>
+    </div>
+
+    <%# ---------- Website form ---------- %>
+    <div class="modal fade" id="int_website" tabindex="-1" aria-labelledby="int_website_title" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h2 class="modal-title h5" id="int_website_title">Website form</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <form method="POST" action="/app?page=integrations">
+          <div class="modal-body" style="font-size:14px;">
+            <input type="hidden" name="action" value="save_lead_capture">
+            <input type="hidden" name="section" value="form">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" role="switch" id="cap_form" name="capture_form_enabled" value="1" <%= data.capture.formEnabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-medium" for="cap_form">Turn on the enquiry form</label>
+            </div>
+            <p class="text-secondary mb-2">Put the link on your website, Instagram bio or WhatsApp.</p>
+            <div class="input-group mb-2">
+              <input class="form-control" id="cap_form_url" value="<%= formUrl %>" readonly aria-label="Enquiry form link">
+              <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_form_url', this)">Copy</button>
+              <% if (data.capture.formEnabled) { %><a class="btn btn-outline-primary" href="/enquire" target="_blank" rel="noopener">Open</a><% } %>
+            </div>
+            <label class="form-label" for="cap_link_project">Link for one project</label>
+            <select class="form-select mb-1" id="cap_link_project" data-base="<%= formUrl %>"
+              onchange="document.getElementById('cap_form_url').value = this.dataset.base + (this.value ? '?project=' + this.value : '')">
+              <option value="">All projects (buyer picks)</option>
+              <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
+            </select>
+            <p class="text-secondary mb-3" style="font-size:13px;">Picks that project on the form. To see which ad or post a lead came from, add <code>?utm_source=instagram&amp;utm_campaign=diwali</code> (or <code>&amp;utm_source=…</code> after a project link). The buyer's answers set the lead to Hot, Warm or Cold, and the assigned agent gets a first call on their follow-ups: Hot within 15 minutes, Warm within 2 hours, Cold the next morning.</p>
+            <label class="form-label" for="cap_source">Mark these leads as source</label>
+            <select class="form-select" id="cap_source" name="capture_source_id">
+              <option value="">Website Enquiry (created automatically)</option>
+              <% data.sources.forEach(s => { %><option value="<%= s._id %>" <%= String(s._id) === String(data.capture.formSourceId) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+        </form>
+      </div></div>
+    </div>
+
+    <%# ---------- One modal per tile ---------- %>
+    <% data.tiles.forEach(t => { const row = t.row; const url = data.base_url + '/api/leads/in/' + t.key; %>
+    <div class="modal fade" id="int_<%= t.key %>" tabindex="-1" aria-labelledby="int_<%= t.key %>_title" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="int_<%= t.key %>_title"><%= t.name %></h2>
+          <span class="badge ms-2 <%= STATUS[t.status].cls %>"><%= STATUS[t.status].label %></span>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" style="font-size:14px;">
+          <form method="POST" action="/app?page=integrations" id="int_form_<%= t.key %>">
+            <input type="hidden" name="action" value="save_integration">
+            <input type="hidden" name="tile" value="<%= t.key %>">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" role="switch" id="int_on_<%= t.key %>" name="enabled" value="1" <%= row && row.enabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-medium" for="int_on_<%= t.key %>">Receive leads from <%= t.name %></label>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-6">
+                <label class="form-label" for="int_src_<%= t.key %>">Mark these leads as source</label>
+                <select class="form-select" id="int_src_<%= t.key %>" name="source_id">
+                  <% if (!row) { %><option value=""><%= t.source %> (created automatically)</option><% } %>
+                  <% data.sources.forEach(s => { %><option value="<%= s._id %>" <%= row && String(s._id) === String(row.source_id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="int_proj_<%= t.key %>">Project, if the lead doesn't name one</label>
+                <select class="form-select" id="int_proj_<%= t.key %>" name="project_id">
+                  <option value="">None</option>
+                  <% data.projects.forEach(p => { %><option value="<%= p._id %>" <%= row && String(p._id) === String(row.project_id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+                </select>
+              </div>
+            </div>
+            <p class="text-secondary" style="font-size:13px;">Leads go to the team set for this source or project on the Lead Sources and Projects pages; otherwise they're shared out across your agents.</p>
+            <button type="submit" class="btn btn-primary mb-3">Save</button>
+          </form>
+
+          <h3 class="h6 fw-semibold mt-2">Your link and key</h3>
+          <div class="input-group mb-2">
+            <input class="form-control" id="int_url_<%= t.key %>" value="<%= url %>" readonly aria-label="<%= t.name %> link">
+            <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('int_url_<%= t.key %>', this)">Copy</button>
+          </div>
+          <% if (row) { %>
+            <div class="input-group mb-2">
+              <input class="form-control font-monospace" id="int_key_<%= t.key %>" type="password" value="<%= row.api_key %>" readonly aria-label="<%= t.name %> key">
+              <button type="button" class="btn btn-outline-secondary" onclick="const k=document.getElementById('int_key_<%= t.key %>');k.type=k.type==='password'?'text':'password'">Show</button>
+              <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('int_key_<%= t.key %>', this)">Copy</button>
+            </div>
+            <form method="POST" action="/app?page=integrations" class="mb-3" onsubmit="return confirm('Make a new key? <%= t.name %> will stop sending leads until you give it the new one.')">
+              <input type="hidden" name="action" value="new_integration_key">
+              <input type="hidden" name="tile" value="<%= t.key %>">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Make a new key</button>
+            </form>
+          <% } else { %>
+            <p class="text-secondary">A secret key is made when you save this the first time.</p>
+          <% } %>
+
+          <h3 class="h6 fw-semibold mt-3">How to connect</h3>
+          <ol class="ps-3">
+            <% t.steps.forEach(s => { %><li class="mb-1"><%= s %></li><% }) %>
+          </ol>
+          <% if (t.note) { %><p class="text-secondary"><%= t.note %></p><% } %>
+          <% if (t.portal && row) { %>
+            <label class="form-label" for="int_mail_<%= t.key %>">Email for your <%= t.name %> account manager</label>
+            <textarea class="form-control mb-1" id="int_mail_<%= t.key %>" rows="7" readonly>Hello,
+
+Please push our <%= t.name %> leads to our CRM as they arrive.
+
+Webhook URL (POST, JSON or form fields): <%= url %>
+Header: X-Api-Key: <%= row.api_key %>
+Fields: name, phone, and if available email, city, project, notes
+
+Thank you,
+<%= brand.company %></textarea>
+            <button type="button" class="btn btn-sm btn-outline-secondary mb-3" onclick="tgCopy('int_mail_<%= t.key %>', this)">Copy email</button>
+          <% } %>
+
+          <h3 class="h6 fw-semibold mt-3">Last <%= t.log.length || '' %> received</h3>
+          <% if (!t.log.length) { %>
+            <p class="text-secondary mb-0">Nothing yet.</p>
+          <% } else { %>
+            <div class="table-responsive">
+              <table class="table table-sm tg-table mb-0">
+                <thead><tr><th>When</th><th>Name</th><th>Result</th></tr></thead>
+                <tbody>
+                  <% t.log.forEach(e => { const r = RESULT[e.result] || RESULT.error; %>
+                    <tr>
+                      <td class="text-nowrap"><%= formatDateTime(e.at) %></td>
+                      <td><% if (e.lead_id) { %><a href="/app?page=leads&amp;q=<%= encodeURIComponent(e.name || '') %>"><%= e.name || 'Lead' %></a><% } else { %><%= e.name || '' %><% } %></td>
+                      <td><span class="badge <%= r.cls %>"><%= r.label %></span><% if (e.detail) { %> <span class="text-secondary"><%= e.detail %></span><% } %></td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+          <% } %>
+        </div>
+      </div></div>
+    </div>
+    <% }) %>
+
+    <%# ---------- General webhook ---------- %>
+    <div class="modal fade" id="int_webhook" tabindex="-1" aria-labelledby="int_webhook_title" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">
+        <div class="modal-header"><h2 class="modal-title h5" id="int_webhook_title">Other tools</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+        <div class="modal-body" style="font-size:14px;">
+          <form method="POST" action="/app?page=integrations">
+            <input type="hidden" name="action" value="save_lead_capture">
+            <input type="hidden" name="section" value="webhook">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" role="switch" id="cap_hook" name="capture_webhook_enabled" value="1" <%= data.capture.webhookEnabled ? 'checked' : '' %>>
+              <label class="form-check-label fw-medium" for="cap_hook">Receive leads on the general link</label>
+            </div>
+            <p class="text-secondary mb-2">Send JSON or form fields <code>name</code>, <code>phone</code> and optionally <code>email</code>, <code>city</code>, <code>project</code>, <code>source</code>, <code>notes</code>, with the key in an <code>X-Api-Key</code> header. Leads are marked with the <code>source</code> they send, or "Webhook". For the sources above, use their own tiles instead.</p>
+            <button type="submit" class="btn btn-primary mb-3">Save</button>
+          </form>
+          <div class="input-group mb-2">
+            <input class="form-control" id="cap_hook_url" value="<%= data.base_url %>/api/leads/capture" readonly aria-label="Webhook URL">
+            <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_hook_url', this)">Copy</button>
+          </div>
+          <% if (data.capture.webhookKey) { %>
+            <div class="input-group mb-2">
+              <input class="form-control font-monospace" id="cap_hook_key" type="password" value="<%= data.capture.webhookKey %>" readonly aria-label="Webhook key">
+              <button type="button" class="btn btn-outline-secondary" onclick="const k=document.getElementById('cap_hook_key');k.type=k.type==='password'?'text':'password'">Show</button>
+              <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_hook_key', this)">Copy</button>
+            </div>
+            <form method="POST" action="/app?page=integrations" onsubmit="return confirm('Create a new key? Anything using the old key will stop sending leads until you update it.')">
+              <input type="hidden" name="action" value="regenerate_capture_key">
+              <button type="submit" class="btn btn-sm btn-outline-danger">Make a new key</button>
+            </form>
+          <% } else { %>
+            <p class="text-secondary mb-0">A secret key is made when you turn this on.</p>
+          <% } %>
+        </div>
+      </div></div>
+    </div>

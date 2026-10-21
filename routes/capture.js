@@ -1,12 +1,14 @@
-// Lead capture from outside the CRM: a public enquiry form (GET/POST /enquire)
-// and a webhook (POST /api/leads/capture). Each is off until turned on in
-// Settings; while off, both answer 404 as if they didn't exist.
+// Lead capture from outside the CRM: a public enquiry form (GET/POST /enquire),
+// the general webhook (POST /api/leads/capture) and one URL per Integrations tile
+// (POST /api/leads/in/<tile>). Each is off until turned on on the Integrations page;
+// while off, it answers 404 as if it didn't exist.
 const express = require('express');
 const { Project } = require('../models');
 const { enquiryLimiter, webhookLimiter } = require('../middleware/rateLimits');
 const { logError } = require('../middleware/requestLog');
 const { sendErrorPage } = require('../utils/errorPage');
 const { captureSettings, captureLead, keyMatches, fromGoogleAds, WEBHOOK_SOURCE } = require('../services/capture');
+const { receive } = require('../services/integrations');
 const { TIMELINES, BUDGETS, PROPERTY_TYPES, SITE_VISITS } = require('../services/enquiryScore');
 
 const router = express.Router();
@@ -73,6 +75,17 @@ router.post('/api/leads/capture', webhookLimiter, safe(async (req, res) => {
   } catch (e) {
     if (!e.status) logError(req, 'lead webhook', e);
     res.status(e.status || 500).json({ ok: false, error: e.status ? e.message : 'Could not save the lead' });
+  }
+}));
+
+// One tile's URL. The key comes in the X-Api-Key header, or as google_key from Google Ads.
+router.post('/api/leads/in/:tile', webhookLimiter, safe(async (req, res) => {
+  try {
+    const { status, body } = await receive(String(req.params.tile), req.body || {}, req.get('x-api-key'));
+    res.status(status).json(body);
+  } catch (e) {
+    logError(req, 'integration ' + req.params.tile, e);
+    res.status(500).json({ ok: false, error: 'Could not save the lead' });
   }
 }));
 

@@ -35,7 +35,7 @@ test('an admin turns them on in Settings and gets a webhook key', async () => {
   assert.equal(res.msg, 'Lead capture settings saved.');
   const key = await models.Setting.findOne({ key: 'capture_webhook_key' }).lean();
   assert.match(key.value, /^[0-9a-f]{48}$/);
-  const page = await (await as(f.admin).get('/app?page=settings')).text();
+  const page = await (await as(f.admin).get('/app?page=integrations')).text();
   assert.ok(page.includes('/enquire'), 'link shown');
   assert.ok(page.includes('/api/leads/capture'), 'webhook URL shown');
 });
