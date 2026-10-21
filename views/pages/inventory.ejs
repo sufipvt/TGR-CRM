@@ -1,0 +1,162 @@
+    <%
+      const S = data.stacking;
+      const proj = data.inv_project;
+      const qs = (extra) => '/app?page=inventory&project=' + (proj ? proj._id : '') + extra;
+      const STATUS_NOTES = { Hold: 'kept for a buyer for a few days', Blocked: 'held back by management' };
+    %>
+    <% if (!proj) { %>
+      <div class="tg-panel text-center text-secondary py-5">Add a project first, then its units show here floor by floor. <a href="/app?page=projects">Go to Projects</a></div>
+    <% } else { %>
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <form method="GET" action="/app" class="d-flex align-items-center gap-2 m-0">
+          <input type="hidden" name="page" value="inventory">
+          <label class="visually-hidden" for="inv_project">Project</label>
+          <select class="form-select" id="inv_project" name="project" onchange="this.form.submit()" style="min-width:200px;">
+            <% data.projects.forEach(p => { %><option value="<%= p._id %>" <%= String(p._id) === String(proj._id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
+          </select>
+          <noscript><button type="submit" class="btn btn-outline-secondary">Show</button></noscript>
+        </form>
+        <% if (S.towers.length > 1 || (S.towers.length === 1 && S.towers[0])) { %>
+          <nav class="d-flex flex-wrap gap-1" aria-label="Towers">
+            <% S.towers.forEach(t => { %>
+              <a class="tg-tower-pill <%= t === S.tower ? 'active' : '' %>" href="<%= qs('&tower=' + encodeURIComponent(t)) %>" <%= t === S.tower ? 'aria-current=page' : '' %>><%= t ? 'Tower ' + t : 'No tower' %></a>
+            <% }) %>
+          </nav>
+        <% } %>
+        <div class="ms-auto d-flex gap-2">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#genUnitsModal"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add units</button>
+          <a class="btn btn-outline-secondary" href="/app?page=projects">List view</a>
+        </div>
+      </div>
+      <div class="d-flex flex-wrap gap-3 mt-3" style="font-size:13px;">
+        <% Object.entries(S.counts).forEach(([s, n]) => { %>
+          <span class="d-inline-flex align-items-center gap-1"><span class="tg-unit-key tg-unit-<%= s.toLowerCase() %>" aria-hidden="true"></span><%= s %> · <strong><%= n %></strong></span>
+        <% }) %>
+        <span class="text-secondary ms-md-auto">Hold = <%= STATUS_NOTES.Hold %>. Blocked = <%= STATUS_NOTES.Blocked %>.</span>
+      </div>
+    </div>
+
+    <div class="tg-panel mt-3">
+      <% if (!S.total) { %>
+        <p class="text-secondary text-center py-4 mb-0">No units in <%= proj.name %> yet. Use <strong>Add units</strong> to add a tower's floors in one go.</p>
+      <% } else { %>
+        <div class="tg-stacking-scroll">
+          <table class="tg-stacking" aria-label="Units of <%= proj.name %><%= S.tower ? ', tower ' + S.tower : '' %> by floor">
+            <tbody>
+              <% S.floors.forEach(f => { %>
+                <tr>
+                  <th scope="row" class="tg-stacking-floor"><%= f.floor === null ? 'No floor' : (f.floor === 0 ? 'Ground' : 'Floor ' + f.floor) %></th>
+                  <td>
+                    <div class="tg-stacking-row">
+                      <% f.units.forEach(u => { %>
+                        <button type="button" class="tg-unit tg-unit-<%= u.status.toLowerCase() %>"
+                          title="<%= u.unit_number %>: <%= u.status %>"
+                          onclick='tgUnitCell(<%= JSON.stringify({
+                            id: String(u._id), no: u.unit_number, status: u.status, bhk: u.bhk || "",
+                            area: u.area_sqft || 0, price: u.base_price ? formatMoney(u.base_price) : "",
+                            phase: u.phase || "", notes: u.notes || ""
+                          }) %>)'>
+                          <span class="tg-unit-no"><%= u.unit_number %></span>
+                          <% if (u.bhk) { %><span class="tg-unit-sub"><%= u.bhk %></span><% } %>
+                        </button>
+                      <% }) %>
+                    </div>
+                  </td>
+                </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+
+    <!-- One unit: details and a quick status change -->
+    <div class="modal fade" id="unitCellModal" tabindex="-1" aria-labelledby="unitCellTitle" aria-hidden="true">
+      <div class="modal-dialog"><div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="unitCellTitle">Unit</h2>
+          <span class="badge ms-2" id="unitCellBadge"></span>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" style="font-size:14px;">
+          <dl class="row mb-3" id="unitCellFacts"></dl>
+          <form method="POST" action="<%= qs('&tower=' + encodeURIComponent(S.tower)) %>" id="unitCellForm">
+            <input type="hidden" name="action" value="set_unit_status">
+            <input type="hidden" name="unit_id" id="unitCellId">
+            <fieldset>
+              <legend class="form-label fw-medium" style="font-size:14px;">Status</legend>
+              <div class="d-flex flex-wrap gap-2">
+                <% ['Available', 'Hold', 'Blocked'].forEach(s => { %>
+                  <input type="radio" class="btn-check" name="status" id="ucs_<%= s %>" value="<%= s %>" required>
+                  <label class="btn btn-outline-primary" for="ucs_<%= s %>"><%= s %></label>
+                <% }) %>
+              </div>
+            </fieldset>
+            <button type="submit" class="btn btn-primary mt-3">Save</button>
+          </form>
+          <p class="text-secondary mb-0" id="unitCellBooked" hidden>This unit is booked. Its status changes when the booking is cancelled, on the <a href="/app?page=bookings">Bookings</a> page.</p>
+        </div>
+      </div></div>
+    </div>
+
+    <!-- Add a tower's units in one go -->
+    <div class="modal fade" id="genUnitsModal" tabindex="-1" aria-labelledby="genUnitsTitle" aria-hidden="true">
+      <div class="modal-dialog"><div class="modal-content">
+        <form method="POST" action="<%= qs('') %>">
+          <div class="modal-header"><h2 class="modal-title h5" id="genUnitsTitle">Add units to <%= proj.name %></h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+          <div class="modal-body">
+            <input type="hidden" name="action" value="generate_units">
+            <input type="hidden" name="project_id" value="<%= proj._id %>">
+            <div class="row g-3">
+              <div class="col-6"><label class="form-label" for="gu_tower">Tower</label><input class="form-control" id="gu_tower" name="tower" maxlength="30" placeholder="e.g. A" oninput="tgUnitPreview()"></div>
+              <div class="col-6"><label class="form-label" for="gu_phase">Phase</label><input class="form-control" id="gu_phase" name="phase" maxlength="30" placeholder="Optional"></div>
+              <div class="col-4"><label class="form-label" for="gu_from">From floor</label><input type="number" class="form-control" id="gu_from" name="floor_from" min="0" max="200" value="1" required oninput="tgUnitPreview()"></div>
+              <div class="col-4"><label class="form-label" for="gu_to">To floor</label><input type="number" class="form-control" id="gu_to" name="floor_to" min="0" max="200" value="10" required oninput="tgUnitPreview()"></div>
+              <div class="col-4"><label class="form-label" for="gu_per">Units a floor</label><input type="number" class="form-control" id="gu_per" name="per_floor" min="1" max="50" value="4" required oninput="tgUnitPreview()"></div>
+              <div class="col-4"><label class="form-label" for="gu_bhk">BHK</label><input class="form-control" id="gu_bhk" name="bhk" maxlength="30" placeholder="e.g. 2BHK"></div>
+              <div class="col-4"><label class="form-label" for="gu_area">Area (sqft)</label><input type="number" class="form-control" id="gu_area" name="area_sqft" min="0"></div>
+              <div class="col-4"><label class="form-label" for="gu_price">Base price</label><input type="number" class="form-control" id="gu_price" name="base_price" min="0"></div>
+            </div>
+            <p class="text-secondary mt-3 mb-0" style="font-size:13px;" id="gu_preview" aria-live="polite"></p>
+            <p class="text-secondary mb-0" style="font-size:13px;">Units are numbered by floor, so floor 12 unit 4 is 1204. Numbers already in this project are skipped. You can edit any unit afterwards on the Projects page.</p>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Add units</button></div>
+        </form>
+      </div></div>
+    </div>
+
+    <script>
+      function tgUnitCell(u) {
+        const booked = u.status === 'Booked' || u.status === 'Sold';
+        document.getElementById('unitCellTitle').textContent = 'Unit ' + u.no;
+        const badge = document.getElementById('unitCellBadge');
+        badge.textContent = u.status;
+        badge.className = 'badge ms-2 tg-unit-badge tg-unit-' + u.status.toLowerCase();
+        const facts = document.getElementById('unitCellFacts');
+        facts.replaceChildren();
+        [['BHK', u.bhk], ['Area', u.area ? u.area + ' sqft' : ''], ['Base price', u.price], ['Phase', u.phase], ['Notes', u.notes]]
+          .filter(([, v]) => v).forEach(([k, v]) => {
+            const dt = document.createElement('dt'); dt.className = 'col-4 fw-medium'; dt.textContent = k;
+            const dd = document.createElement('dd'); dd.className = 'col-8 mb-1'; dd.textContent = v;
+            facts.append(dt, dd);
+          });
+        document.getElementById('unitCellId').value = u.id;
+        document.getElementById('unitCellForm').hidden = booked;
+        document.getElementById('unitCellBooked').hidden = !booked;
+        const radio = document.getElementById('ucs_' + u.status);
+        document.querySelectorAll('#unitCellForm input[name=status]').forEach(r => { r.checked = r === radio; });
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('unitCellModal')).show();
+      }
+      function tgUnitPreview() {
+        const v = id => document.getElementById(id).value;
+        const from = parseInt(v('gu_from'), 10), to = parseInt(v('gu_to'), 10), per = parseInt(v('gu_per'), 10);
+        const out = document.getElementById('gu_preview');
+        if (!(to >= from && per > 0)) { out.textContent = ''; return; }
+        const pre = v('gu_tower').trim() ? v('gu_tower').trim() + '-' : '';
+        const num = (f, i) => pre + f + String(i).padStart(2, '0');
+        out.textContent = 'Adds ' + (to - from + 1) * per + ' units: ' + num(from, 1) + ', ' + num(from, 2) + ' … ' + num(to, per) + '.';
+      }
+      tgUnitPreview();
+    </script>
+    <% } %>
