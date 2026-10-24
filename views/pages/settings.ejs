@@ -25,62 +25,7 @@
 
     <div class="tg-panel mt-3" style="max-width:640px;">
       <h2 class="tg-panel-title">Lead capture</h2>
-      <p class="text-secondary" style="font-size:14px;">Optional. Leads that arrive here are assigned automatically, like CSV imports. A phone number already in the CRM adds a note to that lead instead of a second lead.</p>
-      <form method="POST" action="/app?page=settings">
-        <input type="hidden" name="action" value="save_lead_capture">
-        <div class="form-check form-switch mb-2">
-          <input class="form-check-input" type="checkbox" role="switch" id="cap_form" name="capture_form_enabled" value="1" <%= data.capture.formEnabled ? 'checked' : '' %>>
-          <label class="form-check-label fw-medium" for="cap_form">Enquiry form link</label>
-        </div>
-        <div class="ms-4 mb-3" style="font-size:14px;">
-          <p class="text-secondary mb-2">A page with your company name where buyers leave their details. Put the link on your website, Instagram bio or WhatsApp.</p>
-          <% const formUrl = data.base_url + '/enquire'; %>
-          <div class="input-group mb-2">
-            <input class="form-control" id="cap_form_url" value="<%= formUrl %>" readonly aria-label="Enquiry form link">
-            <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_form_url', this)">Copy</button>
-            <% if (data.capture.formEnabled) { %><a class="btn btn-outline-primary" href="/enquire" target="_blank" rel="noopener">Open</a><% } %>
-          </div>
-          <label class="form-label" for="cap_link_project">Link for one project</label>
-          <select class="form-select mb-1" id="cap_link_project" data-base="<%= formUrl %>"
-            onchange="document.getElementById('cap_form_url').value = this.dataset.base + (this.value ? '?project=' + this.value : '')">
-            <option value="">All projects (buyer picks)</option>
-            <% data.projects.forEach(p => { %><option value="<%= p._id %>"><%= p.name %></option><% }) %>
-          </select>
-          <p class="text-secondary mb-3" style="font-size:13px;">Picks that project on the form. To see which ad or post a lead came from, add <code>?utm_source=instagram&amp;utm_campaign=diwali</code> (or <code>&amp;utm_source=…</code> after a project link). The buyer's answers set the lead to Hot, Warm or Cold, and the assigned agent gets a first call on their follow-ups: Hot within 15 minutes, Warm within 2 hours, Cold the next morning.</p>
-          <label class="form-label" for="cap_source">Mark these leads as source</label>
-          <select class="form-select" id="cap_source" name="capture_source_id">
-            <option value="">Website Enquiry (created automatically)</option>
-            <% data.sources.forEach(s => { %><option value="<%= s._id %>" <%= String(s._id) === String(data.capture.formSourceId) ? 'selected' : '' %>><%= s.name %></option><% }) %>
-          </select>
-        </div>
-        <div class="form-check form-switch mb-2">
-          <input class="form-check-input" type="checkbox" role="switch" id="cap_hook" name="capture_webhook_enabled" value="1" <%= data.capture.webhookEnabled ? 'checked' : '' %>>
-          <label class="form-check-label fw-medium" for="cap_hook">Webhook (Google Ads, Zapier, Pabbly, portals)</label>
-        </div>
-        <div class="ms-4 mb-3" style="font-size:14px;">
-          <p class="text-secondary mb-2">Other tools send leads here. Send JSON or form fields <code>name</code>, <code>phone</code> and optionally <code>email</code>, <code>city</code>, <code>project</code>, <code>source</code>, <code>notes</code>, with the key in an <code>X-Api-Key</code> header. In Google Ads, paste the URL and the key into the lead form's webhook settings.</p>
-          <div class="input-group mb-2">
-            <input class="form-control" id="cap_hook_url" value="<%= data.base_url %>/api/leads/capture" readonly aria-label="Webhook URL">
-            <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_hook_url', this)">Copy</button>
-          </div>
-          <% if (data.capture.webhookKey) { %>
-            <div class="input-group">
-              <input class="form-control font-monospace" id="cap_hook_key" type="password" value="<%= data.capture.webhookKey %>" readonly aria-label="Webhook key">
-              <button type="button" class="btn btn-outline-secondary" onclick="const k=document.getElementById('cap_hook_key');k.type=k.type==='password'?'text':'password'">Show</button>
-              <button type="button" class="btn btn-outline-secondary" onclick="tgCopy('cap_hook_key', this)">Copy</button>
-            </div>
-          <% } else { %>
-            <p class="text-secondary mb-0">A secret key is created when you turn this on.</p>
-          <% } %>
-        </div>
-        <button type="submit" class="btn btn-primary">Save lead capture</button>
-      </form>
-      <% if (data.capture.webhookKey) { %>
-        <form method="POST" action="/app?page=settings" class="mt-2" onsubmit="return confirm('Create a new key? Anything using the old key will stop sending leads until you update it.')">
-          <input type="hidden" name="action" value="regenerate_capture_key">
-          <button type="submit" class="btn btn-sm btn-outline-danger">Create a new key</button>
-        </form>
-      <% } %>
+      <p class="mb-0" style="font-size:14px;">The enquiry form, Google Ads, Facebook, property portals and other lead sources are set up on the <a href="/app?page=integrations">Integrations</a> page.</p>
     </div>
 
     <% if (data.unfixed_followups > 0) { %>

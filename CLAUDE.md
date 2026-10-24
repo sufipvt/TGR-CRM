@@ -13,6 +13,7 @@ A sales CRM for real estate firms: Express 4 + Mongoose 7 (MongoDB Atlas) + serv
 server.js              app setup, route mounting, first-boot admin seed, cron
 config/env.js          env loading + validation (exits early if required vars missing)
 config/constants.js    enum lists shared by schemas, handlers and reports
+config/integrations.js the Integrations page tiles (one per lead source; add a tile here)
 models/                one Mongoose model per file, all registered via models/index.js
 middleware/            auth (JWT cookie + 30s user cache), rate limiters, upload, input sanitizer
 services/              access (who can see/do what), reports, digest, pdf, settings, audit, assignment

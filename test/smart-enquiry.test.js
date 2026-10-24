@@ -105,7 +105,7 @@ test('the webhook scores the same answers', async () => {
 });
 
 test('Settings offers a link per project', async () => {
-  const html = await (await as(f.admin).get('/app?page=settings')).text();
+  const html = await (await as(f.admin).get('/app?page=integrations')).text();
   assert.ok(html.includes('id="cap_link_project"'));
   assert.ok(html.includes('?utm_source=instagram'));
 });

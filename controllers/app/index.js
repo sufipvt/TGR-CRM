@@ -18,12 +18,14 @@ const { countUnfixedFollowUps } = require('../../services/istFollowupFix');
 const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { captureSettings } = require('../../services/capture');
+const { listTiles } = require('../../services/integrations');
 const { notificationSummary } = require('../../services/notify');
 const { loadToday } = require('../../services/dashboard');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
+const { handleIntegrationAction } = require('./integrations');
 
-const ADMIN_PAGES = ['settings', 'audit'];
+const ADMIN_PAGES = ['settings', 'integrations', 'audit'];
 const SUPERADMIN_PAGES = ['users', 'teams'];
 const MANAGER_PAGES = ['sources'];
 
@@ -54,7 +56,7 @@ async function appHandler(req, res) {
       try {
         const msg = req.body.action === 'delete'
           ? (await handleDelete(req), 'Deleted successfully.')
-          : await handlePostAction(req);
+          : (await handleIntegrationAction(req)) ?? await handlePostAction(req);
         return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent(msg));
       } catch (e) {
         formError(e);
@@ -164,9 +166,11 @@ async function appHandler(req, res) {
       data.all_agents = allUsers.filter(u => ['Team Leader', 'Sub Team Leader'].includes(u.role));
     } else if (page === 'settings') {
       data.settings = await getSettings();
-      data.capture = await captureSettings();
-      data.base_url = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/+$/, '');
       data.unfixed_followups = isSuperAdmin(user.role) ? await countUnfixedFollowUps() : 0;
+    } else if (page === 'integrations') {
+      data.capture = await captureSettings();
+      data.tiles = await listTiles();
+      data.base_url = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/+$/, '');
     } else if (page === 'reports') {
       const { from, to, fromStr, toStr } = reportRange(req.query);
       data.report_from = fromStr;

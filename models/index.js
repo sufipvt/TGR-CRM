@@ -12,5 +12,7 @@ module.exports = {
   AuditLog: require('./AuditLog'),
   Setting: require('./Setting'),
   Notification: require('./Notification'),
-  Lock: require('./Lock')
+  Lock: require('./Lock'),
+  Integration: require('./Integration'),
+  IntegrationLog: require('./IntegrationLog')
 };
