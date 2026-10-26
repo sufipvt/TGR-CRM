@@ -586,3 +586,23 @@ a.tg-kpi-link:hover { color: #fff; transform: translateY(-2px); box-shadow: 0 8p
 [data-bs-theme="dark"] .tg-int-tile { background: #1e293b; border-color: #334155; }
 [data-bs-theme="dark"] .tg-int-name { color: #f1f5f9; }
 [data-bs-theme="dark"] .tg-int-blurb { color: #94a3b8; }
+
+/* ---- Inventory: floor-by-floor stacking view ---- */
+.tg-tower-pill { display: inline-flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 16px; border: 1px solid var(--border, #d5dae3); background: var(--panel, #fff); color: var(--ink-2, #374151); font-weight: 600; font-size: 13px; text-decoration: none; }
+.tg-tower-pill.active { background: var(--brand, #1a56db); border-color: var(--brand, #1a56db); color: #fff; }
+.tg-stacking-scroll { overflow-x: auto; }
+.tg-stacking { border-collapse: separate; border-spacing: 0 6px; width: 100%; }
+.tg-stacking-floor { width: 72px; padding-right: 8px; font-size: 12px; font-weight: 600; color: var(--ink-soft, #5b6475); white-space: nowrap; vertical-align: middle; }
+.tg-stacking-row { display: flex; gap: 6px; }
+.tg-unit { flex: 1 0 84px; max-width: 140px; min-height: 44px; border-radius: 8px; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 4px 6px; cursor: pointer; }
+.tg-unit:focus-visible { outline: 3px solid #c7d7fe; outline-offset: 1px; }
+.tg-unit-sub { font-size: 11px; font-weight: 500; }
+.tg-unit-key { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.tg-unit-available { background: #ecfdf5; color: #065f46; border: 1px solid #6ee7b7; }
+.tg-unit-hold { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
+.tg-unit-blocked { background: #fff; color: #5b6475; border: 1px dashed #8a93a3; }
+.tg-unit-booked { background: #1a56db; color: #fff; border: 1px solid #1a56db; }
+.tg-unit-sold { background: #374151; color: #fff; border: 1px solid #374151; }
+.tg-unit-badge { font-weight: 600; }
+[data-bs-theme="dark"] .tg-unit-blocked { background: transparent; color: #cbd5e1; }
+[data-bs-theme="dark"] .tg-tower-pill:not(.active) { background: #1e293b; border-color: #334155; color: #e2e8f0; }

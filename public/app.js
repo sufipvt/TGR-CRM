@@ -441,6 +441,7 @@ async function tgLoadUnits(projectId) {
     sel.innerHTML = '<option value="">Select unit</option>' + units.map(u =>
       '<option value="' + u._id + '">' + escapeHtml(u.unit_number) +
       (u.bhk ? ' \u2014 ' + escapeHtml(u.bhk) : '') +
+      (u.status === 'Hold' ? ' [on hold]' : '') +
       (u.base_price ? ' (' + fmt.money(u.base_price) + ')' : '') +
       '</option>'
     ).join('');
@@ -542,6 +543,9 @@ function tgEditUnit(u) {
   setVal('unProjectId', u.project_id);
   setVal('un_number', u.unit_number);
   setVal('un_type', u.type);
+  setVal('un_tower', u.tower);
+  setVal('un_floor', u.floor);
+  setVal('un_phase', u.phase);
   setVal('un_bhk', u.bhk);
   setVal('un_area', u.area_sqft);
   setVal('un_price', u.base_price);

@@ -28,6 +28,7 @@
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#units-<%= p._id %>">Manage Units (<%= pUnits.length %>)</button>
+              <a class="btn btn-sm btn-outline-secondary" href="/app?page=inventory&amp;project=<%= p._id %>">Floor view</a>
               <button class="btn btn-sm btn-outline-primary" aria-label="Edit project"
                 onclick='tgEditProject(<%= JSON.stringify({
                   _id: String(p._id), name: p.name, developer: p.developer || "", location: p.location || "",
@@ -46,15 +47,16 @@
                     <% if (!pUnits.length) { %><tr><td colspan="6" class="text-secondary" style="font-size:13px;">No units.</td></tr><% } %>
                     <% pUnits.forEach(u => { %>
                       <tr>
-                        <td><%= u.unit_number %></td>
+                        <td><%= u.unit_number %><% if (u.tower || Number.isInteger(u.floor)) { %><div class="text-secondary" style="font-size:11px;"><%= [u.tower && 'Tower ' + u.tower, Number.isInteger(u.floor) && 'Floor ' + u.floor].filter(Boolean).join(' · ') %></div><% } %></td>
                         <td><%= u.bhk || '—' %></td>
                         <td><%= u.area_sqft || '—' %></td>
                         <td style="font-size:13px;"><%= formatMoney(u.base_price) %></td>
-                        <td><span class="badge text-bg-<%= u.status === 'Available' ? 'success' : (u.status === 'Sold' || u.status === 'Booked' ? 'danger' : 'warning') %>" style="font-size:10px;"><%= u.status %></span></td>
+                        <td><span class="badge tg-unit-badge tg-unit-<%= u.status.toLowerCase() %>" style="font-size:10px;"><%= u.status %></span></td>
                         <td class="text-nowrap">
                           <button class="btn btn-sm btn-outline-primary py-0 px-1" aria-label="Edit unit"
                             onclick='tgEditUnit(<%= JSON.stringify({
                               _id: String(u._id), project_id: String(u.project_id), unit_number: u.unit_number,
+                              tower: u.tower || "", floor: Number.isInteger(u.floor) ? u.floor : "", phase: u.phase || "",
                               type: u.type || "", bhk: u.bhk || "", area_sqft: u.area_sqft || 0,
                               base_price: u.base_price || 0, status: u.status, notes: u.notes || ""
                             }) %>)'><i class="fa-solid fa-pen" style="font-size:11px;" aria-hidden="true"></i></button>
@@ -144,13 +146,16 @@
               <div class="row g-3">
                 <div class="col-md-6"><label class="form-label" for="un_number">Unit Number *</label><input class="form-control" id="un_number" name="unit_number" required></div>
                 <div class="col-md-6"><label class="form-label" for="un_type">Type</label><input class="form-control" id="un_type" name="type" placeholder="e.g. Apartment"></div>
+                <div class="col-md-4"><label class="form-label" for="un_tower">Tower</label><input class="form-control" id="un_tower" name="tower" maxlength="30" placeholder="e.g. A"></div>
+                <div class="col-md-4"><label class="form-label" for="un_floor">Floor</label><input type="number" class="form-control" id="un_floor" name="floor" min="-5" max="200" step="1"></div>
+                <div class="col-md-4"><label class="form-label" for="un_phase">Phase</label><input class="form-control" id="un_phase" name="phase" maxlength="30"></div>
                 <div class="col-md-4"><label class="form-label" for="un_bhk">BHK</label><input class="form-control" id="un_bhk" name="bhk" placeholder="e.g. 3BHK"></div>
                 <div class="col-md-4"><label class="form-label" for="un_area">Area (sqft)</label><input type="number" class="form-control" id="un_area" name="area_sqft" min="0"></div>
                 <div class="col-md-4"><label class="form-label" for="un_price">Base Price (INR)</label><input type="number" class="form-control" id="un_price" name="base_price" min="0"></div>
                 <div class="col-md-6">
                   <label class="form-label" for="un_status">Status</label>
                   <select class="form-select" id="un_status" name="status">
-                    <% ['Available','Blocked','Booked','Sold'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
+                    <% UNIT_STATUSES.forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
                   </select>
                 </div>
                 <div class="col-12"><label class="form-label" for="un_notes">Notes</label><input class="form-control" id="un_notes" name="notes"></div>

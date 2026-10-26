@@ -2,7 +2,8 @@
 const bcrypt = require('bcryptjs');
 const { Types } = require('mongoose');
 const {
-  LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, NOT_INTERESTED_REASONS, LOST_REASONS, SITE_VISIT_OUTCOMES
+  LEAD_STATUSES, LEAD_TEMPERATURES, CONTACT_OUTCOMES, NOT_INTERESTED_REASONS, LOST_REASONS, SITE_VISIT_OUTCOMES,
+  UNIT_STATUSES, BOOKABLE_UNIT_STATUSES
 } = require('../../config/constants');
 const {
   User, Project, Unit, LeadSource, Lead, FollowUp, Booking, Payment, Team, Setting
@@ -21,6 +22,15 @@ const { userContextCache } = require('../../middleware/auth');
 const { withLock } = require('../../services/lock');
 
 const BULK_LIMIT = 200;
+
+// Tower, floor and phase from a unit form; a blank floor stays empty.
+function unitPlace(body) {
+  const floor = body.floor === undefined || body.floor === '' ? null : Number(body.floor);
+  if (floor !== null && (!Number.isInteger(floor) || floor < -5 || floor > 200)) {
+    throw Object.assign(new Error('Floor must be a whole number'), { status: 400 });
+  }
+  return { tower: (body.tower || '').slice(0, 30), floor, phase: (body.phase || '').slice(0, 30) };
+}
 
 function forbidden(msg) { return Object.assign(new Error(msg || 'Forbidden'), { status: 403 }); }
 
@@ -269,6 +279,7 @@ async function handlePostAction(req) {
       if (!manager) throw Object.assign(new Error('Forbidden'), { status: 403 });
       const u = await Unit.create({
         project_id: objIdOrNull(body.project_id), unit_number: body.unit_number, type: body.type,
+        ...unitPlace(body),
         bhk: body.bhk, area_sqft: Number(body.area_sqft || 0), base_price: Number(body.base_price || 0),
         status: body.status || 'Available', notes: body.notes
       });
@@ -283,7 +294,7 @@ async function handlePostAction(req) {
         throw Object.assign(new Error('This unit has a booking. Cancel or delete the booking first.'), { status: 400 });
       }
       await Unit.findByIdAndUpdate(body.unit_id, {
-        unit_number: body.unit_number, type: body.type, bhk: body.bhk,
+        unit_number: body.unit_number, type: body.type, ...unitPlace(body), bhk: body.bhk,
         area_sqft: Number(body.area_sqft || 0), base_price: Number(body.base_price || 0),
         status: body.status, notes: body.notes
       }, { runValidators: true });
@@ -389,7 +400,8 @@ async function handlePostAction(req) {
       // simultaneous bookings can flip it from Available, the other gets a clear error.
       const unitId = objIdOrNull(body.unit_id);
       if (!unitId) throw Object.assign(new Error('Select a unit'), { status: 400 });
-      const unit = await Unit.findOneAndUpdate({ _id: unitId, status: 'Available' }, { status: 'Booked' }, { new: true });
+      // Returns the unit as it was, so a failed booking can put back Available or Hold.
+      const unit = await Unit.findOneAndUpdate({ _id: unitId, status: { $in: BOOKABLE_UNIT_STATUSES } }, { status: 'Booked' });
       if (!unit) throw Object.assign(new Error('That unit is no longer available. Pick another unit.'), { status: 409 });
 
       let b;
@@ -402,7 +414,7 @@ async function handlePostAction(req) {
         });
       } catch (e) {
         // Give the unit back so a failed booking never leaves it stuck as Booked
-        await Unit.updateOne({ _id: unit._id, status: 'Booked' }, { status: 'Available' });
+        await Unit.updateOne({ _id: unit._id, status: 'Booked' }, { status: unit.status });
         if (e.name === 'ValidationError') throw Object.assign(new Error('Check the booking amounts and date'), { status: 400 });
         throw e;
       }

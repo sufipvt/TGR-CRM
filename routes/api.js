@@ -1,6 +1,6 @@
 // JSON API routes: lead status, units, lead timeline
 const express = require('express');
-const { LEAD_STATUSES } = require('../config/constants');
+const { LEAD_STATUSES, BOOKABLE_UNIT_STATUSES } = require('../config/constants');
 const { Unit, Lead, FollowUp, Booking, AuditLog } = require('../models');
 const { formatMoney } = require('../utils/format');
 const { audit } = require('../services/audit');
@@ -40,7 +40,7 @@ router.patch('/api/lead/:id/status', requireAuth, appActionLimiter, refreshUserC
 // ---------------------------------------------------------------------------
 router.get('/api/units/:projectId', requireAuth, appActionLimiter, refreshUserContext, async (req, res) => {
   try {
-    const units = await Unit.find({ project_id: req.params.projectId, status: 'Available' }).sort('unit_number');
+    const units = await Unit.find({ project_id: req.params.projectId, status: { $in: BOOKABLE_UNIT_STATUSES } }).sort('tower floor unit_number');
     res.json(units);
   } catch (e) { res.status(500).json({ error: 'Failed to load units' }); }
 });

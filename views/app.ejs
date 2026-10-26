@@ -15,6 +15,7 @@
   navItems.push({ page: 'bookings', label: 'Bookings', icon: 'fa-file-signature' });
  if (isManager) {
     navItems.push({ page: 'projects', label: 'Projects', icon: 'fa-building' });
+    navItems.push({ page: 'inventory', label: 'Inventory', icon: 'fa-table-cells' });
     navItems.push({ page: 'sources', label: 'Lead Sources', icon: 'fa-bullseye' });
   }
   navItems.push({ page: 'reports', label: isManager ? 'Reports' : 'My Report', icon: 'fa-chart-line' });
@@ -27,7 +28,7 @@
     navItems.push({ page: 'settings', label: 'Settings', icon: 'fa-gear' });
     navItems.push({ page: 'audit', label: 'Audit Log', icon: 'fa-clock-rotate-left' });
   }
-  const pageTitles = { dashboard: 'Dashboard', leads: 'Leads', followups: 'Follow-Ups', bookings: 'Bookings', projects: 'Projects', sources: 'Lead Sources', users: 'Users', teams: 'Teams', settings: 'Settings', integrations: 'Integrations', reports: 'Reports', audit: 'Audit Log' };
+  const pageTitles = { dashboard: 'Dashboard', leads: 'Leads', followups: 'Follow-Ups', bookings: 'Bookings', projects: 'Projects', inventory: 'Inventory', sources: 'Lead Sources', users: 'Users', teams: 'Teams', settings: 'Settings', integrations: 'Integrations', reports: 'Reports', audit: 'Audit Log' };
   const statusColors = { 'New': 'primary', 'Working': 'warning', 'Qualified': 'info', 'Site Visit Scheduled': 'secondary', 'Negotiation': 'dark', 'Booked': 'success', 'Lost': 'danger', 'Not Interested': 'danger' };
 %>
 
@@ -54,6 +55,9 @@
   <%# ======================= PROJECTS ======================= %>
   <% } else if (page === 'projects') { %>
 <%- include('pages/projects') -%>
+  <%# ======================= INVENTORY (stacking view) ======================= %>
+  <% } else if (page === 'inventory') { %>
+<%- include('pages/inventory') -%>
   <%# ======================= LEAD SOURCES ======================= %>
   <% } else if (page === 'sources') { %>
 <%- include('pages/sources') -%>

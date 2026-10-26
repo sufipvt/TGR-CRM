@@ -19,15 +19,22 @@ const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { captureSettings } = require('../../services/capture');
 const { listTiles } = require('../../services/integrations');
+const { stackingFor } = require('../../services/stacking');
+const { objIdOrNull } = require('../../utils/request');
 const { notificationSummary } = require('../../services/notify');
 const { loadToday } = require('../../services/dashboard');
 const { handlePostAction } = require('./actions');
 const { handleDelete } = require('./deletes');
 const { handleIntegrationAction } = require('./integrations');
+const { handleInventoryAction } = require('./inventory');
+
+// The stacking view comes back to the tower you were looking at.
+const towerQs = (page, query) => (page === 'inventory' && typeof query.tower === 'string'
+  ? '&tower=' + encodeURIComponent(query.tower.slice(0, 30)) : '');
 
 const ADMIN_PAGES = ['settings', 'integrations', 'audit'];
 const SUPERADMIN_PAGES = ['users', 'teams'];
-const MANAGER_PAGES = ['sources'];
+const MANAGER_PAGES = ['sources', 'inventory'];
 
 // A form with a missing required field or a malformed id is the user's mistake, not
 // a crash: show it as a message on the page instead of the "Something went wrong" screen.
@@ -56,11 +63,11 @@ async function appHandler(req, res) {
       try {
         const msg = req.body.action === 'delete'
           ? (await handleDelete(req), 'Deleted successfully.')
-          : (await handleIntegrationAction(req)) ?? await handlePostAction(req);
-        return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent(msg));
+          : (await handleIntegrationAction(req)) ?? (await handleInventoryAction(req)) ?? await handlePostAction(req);
+        return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + towerQs(page, req.query) + '&msg=' + encodeURIComponent(msg));
       } catch (e) {
         formError(e);
-        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
+        if (e.status) return res.redirect('/app?page=' + encodeURIComponent(page) + keepListQs(req.query) + towerQs(page, req.query) + '&msg=' + encodeURIComponent('Error: ' + e.message));
         throw e;
       }
     }
@@ -150,6 +157,12 @@ async function appHandler(req, res) {
       data.projects_detail = data.projects.map(p => ({ ...p.toObject(), ...unitCountsFor(p, counts) }));
       data.units = await Unit.find().sort('unit_number');
       data.teams = await Team.find().sort('name').select('name').lean();
+    } else if (page === 'inventory') {
+      const wanted = objIdOrNull(req.query.project);
+      data.inv_project = data.projects.find(p => wanted && String(p._id) === String(wanted)) || data.projects[0] || null;
+      data.stacking = data.inv_project
+        ? await stackingFor(data.inv_project._id, typeof req.query.tower === 'string' ? req.query.tower : undefined)
+        : null;
     } else if (page === 'sources') {
       data.teams = await Team.find().sort('name').select('name').lean();
     } else if (page === 'users') {

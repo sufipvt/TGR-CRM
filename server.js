@@ -32,7 +32,7 @@ process.on('unhandledRejection', (reason) => {
 // ---------------------------------------------------------------------------
 const { User } = require('./models');
 const { formatMoney, formatDate, formatDateTime, toDateTimeInput, phoneLinks } = require('./utils/format');
-const { CONTACT_OUTCOMES } = require('./config/constants');
+const { CONTACT_OUTCOMES, UNIT_STATUSES } = require('./config/constants');
 const { sendErrorPage } = require('./utils/errorPage');
 const { logError } = require('./middleware/requestLog');
 const { sendDailyDigest } = require('./services/digest');
@@ -83,6 +83,7 @@ app.locals.formatDateTime = formatDateTime;
 app.locals.toDateTimeInput = toDateTimeInput;
 app.locals.phoneLinks = phoneLinks;
 app.locals.CONTACT_OUTCOMES = CONTACT_OUTCOMES;
+app.locals.UNIT_STATUSES = UNIT_STATUSES;
 // Changes on every deploy so browsers fetch the new app.js/app.css instead of a cached copy.
 app.locals.assetVersion = (process.env.RENDER_GIT_COMMIT || String(Date.now())).slice(0, 12);
 

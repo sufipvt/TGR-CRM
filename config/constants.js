@@ -24,6 +24,11 @@ const LOST_REASONS = [
 // How a site visit went, asked when it's marked done. 'No show' marks the visit Missed.
 const SITE_VISIT_OUTCOMES = ['Interested', 'Thinking it over', 'Wants another visit', 'Not interested', 'No show'];
 
+// Unit status. Hold = kept for a buyer for a few days (still bookable);
+// Blocked = held back by management. Booked and Sold come from bookings.
+const UNIT_STATUSES = ['Available', 'Hold', 'Blocked', 'Booked', 'Sold'];
+const BOOKABLE_UNIT_STATUSES = ['Available', 'Hold'];
+
 const DISPOSITION_REASONS = [...new Set([...NOT_INTERESTED_REASONS, ...LOST_REASONS])];
 
 module.exports = {
@@ -35,5 +40,7 @@ module.exports = {
   NOT_INTERESTED_REASONS,
   LOST_REASONS,
   DISPOSITION_REASONS,
-  SITE_VISIT_OUTCOMES
+  SITE_VISIT_OUTCOMES,
+  UNIT_STATUSES,
+  BOOKABLE_UNIT_STATUSES
 };
