@@ -46,7 +46,20 @@ async function loadLeadPage(Lead, visibleFilter, query) {
     .sort({ listed_at: -1, created_at: -1 })
     .skip((current - 1) * LEADS_PER_PAGE)
     .limit(LEADS_PER_PAGE);
-  return { leads, list: { ...values, page: current, pages, total, per: LEADS_PER_PAGE } };
+  const counts = await statusCounts(Lead, visibleFilter, query);
+  return { leads, list: { ...values, page: current, pages, total, per: LEADS_PER_PAGE, counts } };
+}
+
+// Lead count per status for the status tabs, with every other filter applied
+// (so the tabs answer "how many of these are New, Working, ...").
+async function statusCounts(Lead, visibleFilter, query) {
+  const { conds } = leadListQuery({ ...query, status: '' });
+  const base = conds.length ? [visibleFilter, ...conds] : [visibleFilter];
+  const all = await Lead.countDocuments(base.length > 1 ? { $and: base } : visibleFilter);
+  const per = await Promise.all(LEAD_STATUSES.map(status => Lead.countDocuments({ $and: [...base, { status }] })));
+  const counts = { all };
+  LEAD_STATUSES.forEach((s, i) => { counts[s] = per[i]; });
+  return counts;
 }
 
 // '&q=..&status=..&p=..' for the current list, so an action or delete

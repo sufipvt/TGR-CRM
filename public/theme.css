@@ -128,3 +128,35 @@ a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.
 [data-bs-theme="dark"] .tg-bottomnav { background: #1e293b; border-color: #334155; }
 [data-bs-theme="dark"] .tg-bottomnav a, [data-bs-theme="dark"] .tg-bottomnav button { color: #94a3b8; }
 [data-bs-theme="dark"] .tg-bottomnav .active { color: #93b4f5; }
+
+/* ---------------- Leads: status tabs, pill filters, chips ---------------- */
+.tg-status-tabs { display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid var(--border); scrollbar-width: thin; }
+.tg-status-tabs a {
+  white-space: nowrap; padding: 10px 12px; color: var(--ink-2); font-weight: 500; text-decoration: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tg-status-tabs a:hover { color: var(--ink); }
+.tg-status-tabs a.active { color: var(--brand); font-weight: 600; border-bottom-color: var(--brand); }
+.tg-tab-count { margin-left: 4px; font-size: 12px; padding: 1px 7px; border-radius: 10px; background: #eef0f4; color: var(--ink-2); }
+.tg-status-tabs a.active .tg-tab-count { background: var(--brand-soft); color: var(--brand-dark); }
+.tg-pill-select { border-radius: 999px; max-width: 190px; }
+
+.tg-chip { display: inline-block; white-space: nowrap; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; background: #eef0f4; color: var(--ink-2); }
+.tg-chip-new                  { background: #e1eaff; color: #1e429f; }
+.tg-chip-working              { background: #fef3c7; color: #92400e; }
+.tg-chip-qualified            { background: #d5f5f0; color: #0f5e56; }
+.tg-chip-site-visit-scheduled { background: #ede9fe; color: #5b21b6; }
+.tg-chip-negotiation          { background: #e0e7ff; color: #3730a3; }
+.tg-chip-booked               { background: #d1fae5; color: #065f46; }
+.tg-chip-lost                 { background: #fde8e8; color: #9b1c1c; }
+
+.tg-temp { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--ink-2); }
+.tg-temp::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #6b7280; }
+.tg-temp-hot::before  { background: #dc2626; }
+.tg-temp-warm::before { background: #d97706; }
+
+[data-bs-theme="dark"] .tg-status-tabs { border-color: #334155; }
+[data-bs-theme="dark"] .tg-status-tabs a { color: #cbd5e1; }
+[data-bs-theme="dark"] .tg-status-tabs a.active { color: #93b4f5; border-bottom-color: #93b4f5; }
+[data-bs-theme="dark"] .tg-tab-count { background: #334155; color: #e2e8f0; }
+[data-bs-theme="dark"] .tg-temp { color: #cbd5e1; }

@@ -7,23 +7,33 @@
           L.page > 1 ? { p: L.page } : {})).toString();
         const leadsUrl = '/app?page=leads' + (listQs ? '&' + listQs : '');
       %>
+      <%
+        // Status tabs keep the other filters and drop paging.
+        const tabQs = s => '/app?page=leads' + new URLSearchParams(Object.assign({},
+          L.q ? { q: L.q } : {}, s ? { status: s } : {}, L.source ? { source: L.source } : {},
+          L.project ? { project: L.project } : {}, L.temperature ? { temperature: L.temperature } : {})).toString().replace(/^(?=.)/, '&');
+        const C = L.counts || {};
+      %>
+      <nav class="tg-status-tabs mb-3" aria-label="Filter by status">
+        <a href="<%= tabQs('') %>" class="<%= !L.status ? 'active' : '' %>" <%= !L.status ? 'aria-current=page' : '' %>>All <span class="tg-tab-count"><%= C.all ?? '' %></span></a>
+        <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Not Interested','Lost'].forEach(s => { %>
+          <a href="<%= tabQs(s) %>" class="<%= L.status === s ? 'active' : '' %>" <%= L.status === s ? 'aria-current=page' : '' %>><%= s === 'Site Visit Scheduled' ? 'Site visit' : s %> <span class="tg-tab-count"><%= C[s] ?? '' %></span></a>
+        <% }) %>
+      </nav>
       <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
         <form method="GET" action="/app" class="d-flex flex-wrap gap-2 align-items-center" id="leadFilterForm" role="search">
         <input type="hidden" name="page" value="leads">
         <input type="search" name="q" id="leadSearch" class="form-control" style="max-width:240px;" placeholder="Search name / phone / email" aria-label="Search leads" value="<%= L.q %>">
-        <select name="status" id="leadStatusFilter" class="form-select" style="max-width:180px;" aria-label="Filter by status" onchange="this.form.submit()">
-          <option value="">All Statuses</option>
-          <% ['New','Working','Qualified','Site Visit Scheduled','Negotiation','Booked','Lost','Not Interested'].forEach(s => { %><option value="<%= s %>" <%= L.status === s ? 'selected' : '' %>><%= s %></option><% }) %>
-        </select>
-        <select name="source" id="leadSourceFilter" class="form-select" style="max-width:180px;" aria-label="Filter by source" onchange="this.form.submit()">
+        <input type="hidden" name="status" id="leadStatusFilter" value="<%= L.status %>">
+        <select name="source" id="leadSourceFilter" class="form-select tg-pill-select" style="max-width:180px;" aria-label="Filter by source" onchange="this.form.submit()">
           <option value="">All Sources</option>
           <% data.sources.forEach(s => { %><option value="<%= s._id %>" <%= L.source === String(s._id) ? 'selected' : '' %>><%= s.name %></option><% }) %>
         </select>
-        <select name="project" id="leadProjectFilter" class="form-select" style="max-width:180px;" aria-label="Filter by project" onchange="this.form.submit()">
+        <select name="project" id="leadProjectFilter" class="form-select tg-pill-select" style="max-width:180px;" aria-label="Filter by project" onchange="this.form.submit()">
           <option value="">All Projects</option>
           <% data.projects.forEach(p => { %><option value="<%= p._id %>" <%= L.project === String(p._id) ? 'selected' : '' %>><%= p.name %></option><% }) %>
         </select>
-        <select name="temperature" id="leadTemperatureFilter" class="form-select" style="max-width:160px;" aria-label="Filter by temperature" onchange="this.form.submit()">
+        <select name="temperature" id="leadTemperatureFilter" class="form-select tg-pill-select" style="max-width:160px;" aria-label="Filter by temperature" onchange="this.form.submit()">
           <option value="">All Temperatures</option>
           <option value="Hot" <%= L.temperature === 'Hot' ? 'selected' : '' %>>🔥 Hot</option>
           <option value="Warm" <%= L.temperature === 'Warm' ? 'selected' : '' %>>☀️ Warm</option>
@@ -106,12 +116,9 @@
                 <td class="tg-c-caller"><%= lead.assigned_caller_id ? lead.assigned_caller_id.full_name : '—' %></td>
                <td class="tg-c-closer tg-m-hide"><%= lead.assigned_closer_id ? lead.assigned_closer_id.full_name : '—' %></td>
                 <td class="tg-c-temp">
-                  <% if (lead.temperature === 'Hot') { %><span class="badge text-bg-danger">🔥 Hot</span><% } %>
-                  <% if (lead.temperature === 'Warm') { %><span class="badge text-bg-warning">☀️ Warm</span><% } %>
-                  <% if (lead.temperature === 'Cold') { %><span class="badge text-bg-info">❄️ Cold</span><% } %>
-                  <% if (!lead.temperature) { %><span class="text-secondary">—</span><% } %>
+                  <% if (lead.temperature) { %><span class="tg-temp tg-temp-<%= lead.temperature.toLowerCase() %>"><%= lead.temperature %></span><% } else { %><span class="text-secondary">—</span><% } %>
                 </td>
-                <td class="tg-c-status"><span class="badge text-bg-<%= statusColors[lead.status] || 'secondary' %>"><%= lead.status %></span></td>
+                <td class="tg-c-status"><span class="tg-chip tg-chip-<%= lead.status.toLowerCase().replace(/ /g, '-') %>"><%= lead.status %></span></td>
                 <td class="tg-c-date tg-m-hide text-secondary" style="font-size:13px;"><%= formatDate(lead.created_at) %></td>
                 <td class="tg-c-actions text-nowrap">
                   <%- include('../partials/call-buttons', { lead, log: canEdit }) -%>
