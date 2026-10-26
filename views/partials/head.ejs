@@ -32,4 +32,7 @@
   <script src="/notify.js?v=<%= assetVersion %>" defer></script>
   <script src="/shortcuts.js?v=<%= assetVersion %>" defer></script>
   <script src="/phone.js?v=<%= assetVersion %>" defer></script>
+  <% if (page === 'leads') { %>
+  <script src="/lead-panel.js?v=<%= assetVersion %>" defer></script>
+  <% } %>
 </head>

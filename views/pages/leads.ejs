@@ -98,7 +98,17 @@
                   data-search="<%= (lead.name + ' ' + lead.phone + ' ' + (lead.email || '')).toLowerCase() %>">
                 <td class="tg-c-check"><% if (canEdit) { %><input type="checkbox" class="form-check-input tg-bulk" form="bulkLeadForm" name="lead_ids" value="<%= lead._id %>" aria-label="Select <%= lead.name %>" onchange="tgBulkChanged()"><% } %></td>
                 <td class="tg-c-lead">
-                  <div class="fw-medium"><%= lead.name %></div>
+                  <% const pl = phoneLinks(lead.phone); %>
+                  <button type="button" class="tg-lead-open fw-medium" title="Open lead"
+                    onclick='tgOpenLead(<%= JSON.stringify({
+                      id: String(lead._id), name: lead.name, phone: lead.phone, tel: pl.tel, canEdit,
+                      wa: pl.wa ? pl.wa + '?text=' + encodeURIComponent('Hi ' + lead.name + ', this is ' + brand.company + '.') : '',
+                      status: lead.status, temperature: lead.temperature || "",
+                      project: lead.project_id ? lead.project_id.name : "", source: lead.source_id ? lead.source_id.name : "",
+                      caller: lead.assigned_caller_id ? lead.assigned_caller_id.full_name : "",
+                      closer: lead.assigned_closer_id ? lead.assigned_closer_id.full_name : "",
+                      budget: lead.budget_range || "", city: lead.city || "", created: formatDate(lead.created_at)
+                    }) %>)'><%= lead.name %></button>
                   <div class="text-secondary" style="font-size:11px;">#<%= String(lead._id).slice(-6).toUpperCase() %></div>
                   <% if (lead.last_enquiry_at) { %>
                     <span class="badge text-bg-warning" title="Last enquired <%= formatDateTime(lead.last_enquiry_at) %>">Re-enquired<%= lead.enquiry_count > 1 ? ' ×' + lead.enquiry_count : '' %></span>
@@ -140,7 +150,7 @@
                       <input type="hidden" name="status" value="Qualified">
                       <button type="submit" class="btn btn-sm btn-outline-success" title="Interested / Qualified">INT</button>
                     </form>
-                    <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead"
+                    <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit lead" data-edit-for="<%= lead._id %>"
                     onclick='tgEditLead(<%= JSON.stringify({
                       _id: String(lead._id), name: lead.name, phone: lead.phone, email: lead.email || "", city: lead.city || "",
                       source_id: lead.source_id ? String(lead.source_id._id) : "", project_id: lead.project_id ? String(lead.project_id._id) : "",
@@ -479,12 +489,24 @@
     <% } %>
 
     <!-- Timeline Offcanvas -->
-    <div class="offcanvas offcanvas-end" tabindex="-1" id="timelineOffcanvas" aria-labelledby="timelineTitle">
-      <div class="offcanvas-header">
-        <h2 class="offcanvas-title h5" id="timelineTitle">Lead Timeline</h2>
+    <div class="offcanvas offcanvas-end tg-lead-panel" tabindex="-1" id="timelineOffcanvas" aria-labelledby="timelineTitle">
+      <div class="offcanvas-header align-items-start">
+        <div class="flex-grow-1 min-w-0">
+          <h2 class="offcanvas-title h5" id="timelineTitle">Lead Timeline</h2>
+          <div class="tg-lp-sub" id="lpSub" hidden></div>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
       </div>
-      <div class="offcanvas-body" id="timelineBody">
+      <div id="lpHead" hidden>
+        <div class="tg-lp-actions">
+          <a class="btn btn-primary" id="lpCall" href="#" data-via="Call"><i class="fa-solid fa-phone me-1" aria-hidden="true"></i>Call</a>
+          <a class="btn btn-outline-success" id="lpWa" href="#" target="_blank" rel="noopener" data-via="WhatsApp"><i class="fa-brands fa-whatsapp me-1" aria-hidden="true"></i>WhatsApp</a>
+          <button type="button" class="btn btn-outline-secondary" id="lpEdit"><i class="fa-solid fa-pen me-1" aria-hidden="true"></i>Edit</button>
+        </div>
+        <dl class="tg-lp-facts" id="lpFacts"></dl>
+        <div class="tg-lp-label">Activity</div>
+      </div>
+      <div class="offcanvas-body pt-2" id="timelineBody">
         <p class="text-secondary">Loading…</p>
       </div>
     </div>

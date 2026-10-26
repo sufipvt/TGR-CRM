@@ -160,3 +160,19 @@ a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.
 [data-bs-theme="dark"] .tg-status-tabs a.active { color: #93b4f5; border-bottom-color: #93b4f5; }
 [data-bs-theme="dark"] .tg-tab-count { background: #334155; color: #e2e8f0; }
 [data-bs-theme="dark"] .tg-temp { color: #cbd5e1; }
+
+/* ---------------- Lead panel (Leads page side panel) ---------------- */
+.tg-lead-open { border: 0; background: none; padding: 0; color: var(--ink); text-align: left; }
+.tg-lead-open:hover { color: var(--brand); text-decoration: underline; }
+.tg-lead-panel { width: 420px !important; max-width: 100vw; }
+.tg-lp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; font-size: 14px; color: var(--ink-2); }
+#lpHead { padding: 0 16px 8px; border-bottom: 1px solid var(--border); }
+.tg-lp-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.tg-lp-actions .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.tg-lp-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; margin: 16px 0 12px; }
+.tg-lp-facts dt { font-size: 12px; font-weight: 500; color: var(--ink-soft); }
+.tg-lp-facts dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+.tg-lp-label { font-size: 12px; font-weight: 600; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+@media (max-width: 575.98px) { .tg-lead-panel { width: 100vw !important; } }
+[data-bs-theme="dark"] .tg-lead-open { color: #e2e8f0; }
+[data-bs-theme="dark"] #lpHead { border-color: #334155; }
