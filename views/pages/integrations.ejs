@@ -14,6 +14,9 @@
       const formUrl = data.base_url + '/enquire';
       const formStatus = data.capture.formEnabled ? 'on' : 'off';
       const hookStatus = data.capture.webhookEnabled ? 'on' : 'off';
+      // Held-back tiles show greyed out, unless a client already switched one on.
+      const soon = t => t.comingSoon && !(t.row && t.row.enabled);
+      const otherSoon = data.otherToolsComingSoon && !data.capture.webhookEnabled;
     %>
     <div class="tg-panel">
       <h2 class="tg-panel-title mb-1">Integrations</h2>
@@ -28,19 +31,37 @@
         <span class="badge <%= STATUS[formStatus].cls %>"><%= STATUS[formStatus].label %></span>
       </button>
       <% data.tiles.forEach(t => { %>
+        <% if (soon(t)) { %>
+        <div class="tg-int-tile tg-int-soon" aria-disabled="true">
+          <span class="tg-int-logo"><% if (t.icon) { %><i class="<%= t.icon %>" aria-hidden="true"></i><% } else { %><%= t.initials %><% } %></span>
+          <span class="tg-int-name"><%= t.name %></span>
+          <span class="tg-int-blurb"><%= t.blurb %></span>
+          <span class="badge tg-soon-badge">Coming soon</span>
+        </div>
+        <% } else { %>
         <button type="button" class="tg-int-tile" data-bs-toggle="modal" data-bs-target="#int_<%= t.key %>">
           <span class="tg-int-logo" style="background:<%= t.color %>;"><% if (t.icon) { %><i class="<%= t.icon %>" aria-hidden="true"></i><% } else { %><%= t.initials %><% } %></span>
           <span class="tg-int-name"><%= t.name %></span>
           <span class="tg-int-blurb"><%= t.blurb %></span>
           <span class="badge <%= STATUS[t.status].cls %>"><%= STATUS[t.status].label %><%= t.leads7d ? ' · ' + t.leads7d + ' this week' : '' %></span>
         </button>
+        <% } %>
       <% }) %>
+      <% if (otherSoon) { %>
+      <div class="tg-int-tile tg-int-soon" aria-disabled="true">
+        <span class="tg-int-logo"><i class="fa-solid fa-code" aria-hidden="true"></i></span>
+        <span class="tg-int-name">Other tools</span>
+        <span class="tg-int-blurb">One general link for anything else that can send a web request.</span>
+        <span class="badge tg-soon-badge">Coming soon</span>
+      </div>
+      <% } else { %>
       <button type="button" class="tg-int-tile" data-bs-toggle="modal" data-bs-target="#int_webhook">
         <span class="tg-int-logo" style="background:#4b5563;"><i class="fa-solid fa-code" aria-hidden="true"></i></span>
         <span class="tg-int-name">Other tools</span>
         <span class="tg-int-blurb">One general link for anything else that can send a web request.</span>
         <span class="badge <%= STATUS[hookStatus].cls %>"><%= STATUS[hookStatus].label %></span>
       </button>
+      <% } %>
     </div>
 
     <%# ---------- Website form ---------- %>
