@@ -160,3 +160,11 @@ a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.
 [data-bs-theme="dark"] .tg-status-tabs a.active { color: #93b4f5; border-bottom-color: #93b4f5; }
 [data-bs-theme="dark"] .tg-tab-count { background: #334155; color: #e2e8f0; }
 [data-bs-theme="dark"] .tg-temp { color: #cbd5e1; }
+
+/* ---------------- Integrations: held-back tiles ---------------- */
+.tg-int-soon { cursor: default; opacity: 0.75; background: var(--panel-head); }
+.tg-int-soon:hover { border-color: var(--border); box-shadow: none; }
+.tg-int-soon .tg-int-logo { background: #9aa3b2; }
+.tg-soon-badge { background: #eef0f4; color: var(--ink-2); border: 1px dashed var(--border-input); }
+[data-bs-theme="dark"] .tg-int-soon { background: #172033; }
+[data-bs-theme="dark"] .tg-soon-badge { background: #273449; color: #cbd5e1; }

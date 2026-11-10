@@ -19,6 +19,7 @@ const { loadLeadPage, keepListQs } = require('../../services/leadList');
 const { unitCountsByProject, unitCountsFor } = require('../../services/inventory');
 const { captureSettings } = require('../../services/capture');
 const { listTiles } = require('../../services/integrations');
+const { OTHER_TOOLS_COMING_SOON } = require('../../config/integrations');
 const { stackingFor } = require('../../services/stacking');
 const { objIdOrNull } = require('../../utils/request');
 const { notificationSummary } = require('../../services/notify');
@@ -183,6 +184,7 @@ async function appHandler(req, res) {
     } else if (page === 'integrations') {
       data.capture = await captureSettings();
       data.tiles = await listTiles();
+      data.otherToolsComingSoon = OTHER_TOOLS_COMING_SOON;
       data.base_url = (process.env.APP_URL || (req.protocol + '://' + req.get('host'))).replace(/\/+$/, '');
     } else if (page === 'reports') {
       const { from, to, fromStr, toStr } = reportRange(req.query);

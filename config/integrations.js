@@ -2,8 +2,11 @@
 // switch on by itself: it gets its own URL and secret key, and its leads are tagged
 // with `source`. Adding a tile here is all it takes; nothing else is per-tile.
 // `steps` is shown in the tile's setup panel, written for the client's admin.
+// `comingSoon` greys a tile out on the page until we launch it. A tile a client
+// already switched on keeps working and stays usable.
 const INTEGRATIONS = [
   {
+    comingSoon: true,
     key: 'google_ads', name: 'Google Ads', source: 'Google Ads', icon: 'fa-brands fa-google', color: '#4285f4',
     blurb: 'Lead form ads on Search, YouTube and Display.',
     steps: [
@@ -14,6 +17,7 @@ const INTEGRATIONS = [
     ]
   },
   {
+    comingSoon: true,
     key: 'facebook', name: 'Facebook & Instagram', source: 'Facebook', icon: 'fa-brands fa-meta', color: '#0866ff',
     blurb: 'Lead ads on Facebook and Instagram, sent through Zapier, Pabbly or Make.',
     steps: [
@@ -25,21 +29,25 @@ const INTEGRATIONS = [
     note: 'A direct "Connect Facebook" button is coming once Meta approves it.'
   },
   {
+    comingSoon: true,
     key: '99acres', name: '99acres', source: '99acres', initials: '99', color: '#0078db',
     blurb: 'Leads from your 99acres listings.',
     portal: true
   },
   {
+    comingSoon: true,
     key: 'magicbricks', name: 'MagicBricks', source: 'MagicBricks', initials: 'MB', color: '#d8232a',
     blurb: 'Leads from your MagicBricks listings.',
     portal: true
   },
   {
+    comingSoon: true,
     key: 'housing', name: 'Housing.com', source: 'Housing.com', initials: 'H', color: '#7b2fbe',
     blurb: 'Leads from your Housing.com listings.',
     portal: true
   },
   {
+    comingSoon: true,
     key: 'zapier', name: 'Zapier, Pabbly & Make', source: 'Zapier', icon: 'fa-solid fa-bolt', color: '#ff4f00',
     blurb: 'Any app those tools connect to: landing pages, chat bots, sheets.',
     steps: [
@@ -62,4 +70,7 @@ INTEGRATIONS.forEach(t => { if (t.portal) t.steps = PORTAL_STEPS(t.name); });
 
 const byKey = key => INTEGRATIONS.find(t => t.key === key) || null;
 
-module.exports = { INTEGRATIONS, byKey };
+// The general "Other tools" webhook on the same page is held back too.
+const OTHER_TOOLS_COMING_SOON = true;
+
+module.exports = { INTEGRATIONS, byKey, OTHER_TOOLS_COMING_SOON };

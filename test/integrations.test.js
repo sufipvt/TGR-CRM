@@ -19,6 +19,9 @@ test('admins see the tiles; agents and Team Leaders do not', async () => {
     assert.ok(html.includes(name), name);
   }
   assert.ok(html.includes('Not connected'));
+  assert.ok(html.includes('Coming soon'), 'held-back tiles are greyed out');
+  assert.ok(!html.includes('data-bs-target="#int_99acres"'), 'a held-back tile does not open');
+  assert.ok(html.includes('data-bs-target="#int_website"'), 'the website form still opens');
   assert.ok(html.includes('href="/app?page=integrations"'), 'in the menu');
   for (const u of [f.tlA, f.subA]) {
     const page = await (await as(u).get('/app?page=integrations')).text();
@@ -57,6 +60,7 @@ test('a tile is off until switched on, and then takes leads only with its own ke
 
   const html = await (await as(f.admin).get('/app?page=integrations')).text();
   assert.ok(html.includes('Connected · 2 this week'));
+  assert.ok(html.includes('data-bs-target="#int_99acres"'), 'a tile already switched on stays usable');
   assert.ok(html.includes('Wrong or missing key'));
   assert.ok(html.includes('Priya Portal'));
   assert.ok(html.includes('Email for your 99acres account manager'));
