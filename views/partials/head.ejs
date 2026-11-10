@@ -35,4 +35,7 @@
   <% if (page === 'leads') { %>
   <script src="/lead-panel.js?v=<%= assetVersion %>" defer></script>
   <% } %>
+  <% if (page === 'followups' || page === 'bookings') { %>
+  <script src="/list-tabs.js?v=<%= assetVersion %>" defer></script>
+  <% } %>
 </head>

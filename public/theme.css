@@ -184,3 +184,35 @@ a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.
 @media (max-width: 575.98px) { .tg-lead-panel { width: 100vw !important; } }
 [data-bs-theme="dark"] .tg-lead-open { color: #e2e8f0; }
 [data-bs-theme="dark"] #lpHead { border-color: #334155; }
+
+/* ---------------- Follow-ups and Bookings: tabs as buttons, status chips ---------------- */
+.tg-status-tabs button {
+  white-space: nowrap; padding: 10px 12px; color: var(--ink-2); font-weight: 500; background: none;
+  border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.tg-status-tabs button:hover { color: var(--ink); }
+.tg-status-tabs button.active { color: var(--brand); font-weight: 600; border-bottom-color: var(--brand); }
+.tg-status-tabs button.active .tg-tab-count { background: var(--brand-soft); color: var(--brand-dark); }
+.tg-status-tabs button.tg-tab-alert .tg-tab-count { background: #fde8e8; color: #9b1c1c; }
+.tg-status-tabs button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
+.tg-overdue { color: #b91c1c; font-weight: 600; }
+
+.tg-chip-fu-pending   { background: #fef3c7; color: #92400e; }
+.tg-chip-fu-completed { background: #d1fae5; color: #065f46; }
+.tg-chip-fu-missed    { background: #fde8e8; color: #9b1c1c; }
+.tg-chip-bk-tentative { background: #fef3c7; color: #92400e; }
+.tg-chip-bk-confirmed { background: #d1fae5; color: #065f46; }
+.tg-chip-bk-cancelled { background: #fde8e8; color: #9b1c1c; }
+
+@media (max-width: 767.98px) {
+  .tg-table.tg-stack td { padding: 0; }
+  .tg-bk-stack .tg-c-project::before { content: none; }
+  .tg-bk-stack .tg-c-unit, .tg-bk-stack .tg-c-money { order: 4; font-size: 13px; color: var(--ink-soft); }
+  .tg-bk-stack .tg-c-unit::before, .tg-bk-stack .tg-c-money::before { content: "· "; }
+  .tg-bk-stack .tg-c-when { order: 5; }
+}
+
+[data-bs-theme="dark"] .tg-status-tabs button { color: #cbd5e1; }
+[data-bs-theme="dark"] .tg-status-tabs button.active { color: #93b4f5; border-bottom-color: #93b4f5; }
+[data-bs-theme="dark"] .tg-overdue { color: #fca5a5; }
+@media (min-width: 768px) { .tg-bk-stack .tg-c-ref, .tg-bk-stack .tg-c-unit, .tg-bk-stack .tg-c-money, .tg-bk-stack .tg-c-when { white-space: nowrap; } }
