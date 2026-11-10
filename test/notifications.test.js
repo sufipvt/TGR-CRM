@@ -62,8 +62,8 @@ test('a repeat enquiry bumps the existing lead and alerts its owners', async () 
 
 test('the re-enquired lead tops the list with a badge', async () => {
   const html = await (await as(f.admin).get('/app?page=leads')).text();
-  const anil = html.indexOf('"fw-medium">Anil D&#39;Souza</div>');
-  const nora = html.indexOf('"fw-medium">Nora New</div>');
+  const anil = html.indexOf('>Anil D&#39;Souza</button>');
+  const nora = html.indexOf('>Nora New</button>');
   assert.ok(anil > 0 && nora > 0, 'both listed');
   assert.ok(anil < nora, 'repeat enquiry above the newer lead');
   assert.ok(html.includes('Re-enquired'));
