@@ -1,8 +1,10 @@
 <head>
   <script>
     (function() {
-      var theme = localStorage.getItem('tgTheme') || 'light';
+      var theme = 'light', text = '';
+      try { theme = localStorage.getItem('tgTheme') || 'light'; text = localStorage.getItem('tgText') || ''; } catch (e) {}
       document.documentElement.setAttribute('data-bs-theme', theme);
+      if (text === 'large') document.documentElement.setAttribute('data-text', 'large');
     })();
   </script>
   <meta charset="UTF-8">
@@ -32,6 +34,7 @@
   <script src="/notify.js?v=<%= assetVersion %>" defer></script>
   <script src="/shortcuts.js?v=<%= assetVersion %>" defer></script>
   <script src="/phone.js?v=<%= assetVersion %>" defer></script>
+  <script src="/text-size.js?v=<%= assetVersion %>" defer></script>
   <% if (page === 'leads') { %>
   <script src="/lead-panel.js?v=<%= assetVersion %>" defer></script>
   <% } %>

@@ -216,3 +216,35 @@ a.tg-kpi-link:hover { color: var(--ink); box-shadow: 0 6px 16px rgba(15,22,35,0.
 [data-bs-theme="dark"] .tg-status-tabs button.active { color: #93b4f5; border-bottom-color: #93b4f5; }
 [data-bs-theme="dark"] .tg-overdue { color: #fca5a5; }
 @media (min-width: 768px) { .tg-bk-stack .tg-c-ref, .tg-bk-stack .tg-c-unit, .tg-bk-stack .tg-c-money, .tg-bk-stack .tg-c-when { white-space: nowrap; } }
+
+/* ---------------- Larger text (top bar "AA" button) ---------------- */
+/* Sizes across the app are in px, so the whole page is scaled instead. */
+html[data-text="large"] body { zoom: 1.15; }
+/* Phones: keep the top bar at normal size so its buttons still fit on one line. */
+@media (max-width: 767.98px) { html[data-text="large"] .tg-topbar { zoom: 0.87; } }
+.tg-text-toggle { font-weight: 700; font-size: 13px; letter-spacing: -0.02em; }
+.tg-text-toggle .tg-text-big { font-size: 17px; }
+.tg-text-toggle[aria-pressed="true"] { background: var(--brand-soft); color: var(--brand-dark); border-color: var(--brand); }
+[data-bs-theme="dark"] .tg-text-toggle[aria-pressed="true"] { background: #1e3a8a; color: #dbeafe; border-color: #93b4f5; }
+
+/* ---------------- Dark mode: chips and tab alerts ---------------- */
+[data-bs-theme="dark"] .tg-chip { background: #334155; color: #e2e8f0; }
+[data-bs-theme="dark"] .tg-chip-new { background: rgba(59,130,246,0.22); color: #bfdbfe; }
+[data-bs-theme="dark"] .tg-chip-working,
+[data-bs-theme="dark"] .tg-chip-fu-pending,
+[data-bs-theme="dark"] .tg-chip-bk-tentative { background: rgba(245,158,11,0.2); color: #fde68a; }
+[data-bs-theme="dark"] .tg-chip-qualified { background: rgba(20,184,166,0.2); color: #99f6e4; }
+[data-bs-theme="dark"] .tg-chip-site-visit-scheduled { background: rgba(139,92,246,0.22); color: #ddd6fe; }
+[data-bs-theme="dark"] .tg-chip-negotiation { background: rgba(99,102,241,0.24); color: #c7d2fe; }
+[data-bs-theme="dark"] .tg-chip-booked,
+[data-bs-theme="dark"] .tg-chip-fu-completed,
+[data-bs-theme="dark"] .tg-chip-bk-confirmed { background: rgba(16,185,129,0.2); color: #a7f3d0; }
+[data-bs-theme="dark"] .tg-chip-lost,
+[data-bs-theme="dark"] .tg-chip-fu-missed,
+[data-bs-theme="dark"] .tg-chip-bk-cancelled { background: rgba(239,68,68,0.2); color: #fecaca; }
+[data-bs-theme="dark"] .tg-status-tabs button.active .tg-tab-count,
+[data-bs-theme="dark"] .tg-status-tabs a.active .tg-tab-count { background: #1e3a8a; color: #dbeafe; }
+[data-bs-theme="dark"] .tg-status-tabs button.tg-tab-alert .tg-tab-count { background: rgba(239,68,68,0.25); color: #fecaca; }
+[data-bs-theme="dark"] .tg-table tbody tr:hover { background: #22304a; }
+[data-bs-theme="dark"] .btn-outline-secondary { background: transparent; color: #cbd5e1; border-color: #475569; }
+[data-bs-theme="dark"] .btn-outline-secondary:hover { background: #273449; color: #f1f5f9; border-color: #64748b; }
