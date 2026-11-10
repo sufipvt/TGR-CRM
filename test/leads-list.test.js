@@ -73,3 +73,14 @@ test('deleting a lead is a POST that returns to the same filtered page', async (
   assert.match(r.location, /^\/app\?page=leads&status=New&p=2&msg=/);
   assert.equal(await models.Lead.exists({ _id: lead._id }), null);
 });
+
+test('a lead name opens the side panel, and its script loads only on the Leads page', async () => {
+  const html = await page(f.admin, '&q=Bulk%20Lead%2001');
+  assert.ok(html.includes('/lead-panel.js'));
+  assert.ok(html.includes('class="tg-lead-open'));
+  assert.match(html, /tgOpenLead\(\{&#34;id&#34;:&#34;[0-9a-f]{24}&#34;,&#34;name&#34;:&#34;Bulk Lead 01&#34;/);
+  assert.ok(html.includes('data-edit-for="'), 'the panel\'s Edit reuses the row\'s edit button');
+  assert.ok(html.includes('id="lpHead"'));
+  const dash = await (await as(f.admin).get('/app?page=dashboard')).text();
+  assert.ok(!dash.includes('/lead-panel.js'));
+});
