@@ -4,14 +4,18 @@
         const k = String(p.booking_id);
         paidByBooking[k] = (paidByBooking[k] || 0) + p.amount;
       });
+      const bookingTabs = [['', 'All'], ['Tentative', 'Tentative'], ['Confirmed', 'Confirmed'], ['Cancelled', 'Cancelled']]
+        .map(([value, label]) => ({ value, label, count: value ? data.bookings.filter(b => b.status === value).length : data.bookings.length }));
     %>
     <div class="tg-panel">
+      <nav class="tg-status-tabs mb-3" aria-label="Bookings by status" data-tabs data-tab-input="bookingStatusFilter">
+        <% bookingTabs.forEach((t, i) => { %>
+          <button type="button" data-tab="<%= t.value %>" class="<%= i === 0 ? 'active' : '' %>" aria-pressed="<%= i === 0 %>"><%= t.label %> <span class="tg-tab-count"><%= t.count %></span></button>
+        <% }) %>
+      </nav>
+      <input type="hidden" id="bookingStatusFilter" value="">
       <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
-        <input type="search" id="bookingSearch" class="form-control" style="max-width:240px;" placeholder="Search lead / project / unit" aria-label="Search bookings">
-        <select id="bookingStatusFilter" class="form-select" style="max-width:160px;" aria-label="Filter by status">
-          <option value="">All Statuses</option>
-          <% ['Tentative','Confirmed','Cancelled'].forEach(s => { %><option value="<%= s %>"><%= s %></option><% }) %>
-        </select>
+        <input type="search" id="bookingSearch" class="form-control tg-pill-select" style="max-width:260px;" placeholder="Search lead / project / unit" aria-label="Search bookings">
         <div class="ms-auto d-flex gap-2">
           <button class="btn btn-outline-secondary" onclick="tgExportBookingsCsv()"><i class="fa-solid fa-download me-1" aria-hidden="true"></i>Export CSV</button>
           <button data-quick="new" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bookingModal" onclick="tgResetBookingForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Booking</button>
@@ -19,7 +23,7 @@
       </div>
 
       <div class="table-responsive">
-        <table class="table tg-table align-middle" id="bookingsTable">
+        <table class="table tg-table tg-stack tg-bk-stack align-middle" id="bookingsTable">
           <thead><tr><th>ID</th><th>Lead</th><th>Project</th><th>Unit</th><th>Closer</th><th>Sale Value</th><th>Booking Amt</th><th>Paid</th><th>Balance</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody>
             <% if (!data.bookings.length) { %>
@@ -30,18 +34,18 @@
               const balance = (b.sale_value || 0) - paid;
             %>
               <tr data-status="<%= b.status %>" data-search="<%= ((b.lead_id ? b.lead_id.name : '') + ' ' + (b.project_id ? b.project_id.name : '') + ' ' + (b.unit_id ? b.unit_id.unit_number : '')).toLowerCase() %>">
-                <td class="fw-medium"><%= brand.refPrefix %><%= String(b._id).slice(-8).toUpperCase() %></td>
-                <td><%= b.lead_id ? b.lead_id.name : '—' %></td>
-                <td><%= b.project_id ? b.project_id.name : '—' %></td>
-                <td><%= b.unit_id ? b.unit_id.unit_number : '—' %></td>
-                <td><%= b.closer_id ? b.closer_id.full_name : '—' %></td>
-                <td><%= formatMoney(b.sale_value) %></td>
-                <td><%= formatMoney(b.booking_amount) %></td>
-                <td class="text-success"><%= formatMoney(paid) %></td>
-                <td class="<%= balance > 0 ? 'text-danger' : 'text-success' %>"><%= formatMoney(balance) %></td>
-                <td><span class="badge text-bg-<%= b.status === 'Confirmed' ? 'success' : (b.status === 'Cancelled' ? 'danger' : 'warning') %>"><%= b.status %></span></td>
-                <td style="font-size:13px;"><%= formatDate(b.booking_date) %></td>
-                <td class="text-nowrap">
+                <td class="tg-c-ref tg-m-hide text-secondary" style="font-size:13px;"><%= brand.refPrefix %><%= String(b._id).slice(-8).toUpperCase() %></td>
+                <td class="tg-c-lead fw-medium"><%= b.lead_id ? b.lead_id.name : '—' %></td>
+                <td class="tg-c-project"><%= b.project_id ? b.project_id.name : '—' %></td>
+                <td class="tg-c-unit"><%= b.unit_id ? b.unit_id.unit_number : '—' %></td>
+                <td class="tg-c-owner"><%= b.closer_id ? b.closer_id.full_name : '—' %></td>
+                <td class="tg-c-money"><%= formatMoney(b.sale_value) %></td>
+                <td class="tg-c-money tg-m-hide"><%= formatMoney(b.booking_amount) %></td>
+                <td class="tg-c-money tg-m-hide text-success"><%= formatMoney(paid) %></td>
+                <td class="tg-c-money tg-m-hide <%= balance > 0 ? 'text-danger' : 'text-success' %>"><%= formatMoney(balance) %></td>
+                <td class="tg-c-status"><span class="tg-chip tg-chip-bk-<%= String(b.status).toLowerCase() %>"><%= b.status %></span></td>
+                <td class="tg-c-when" style="font-size:13px;"><%= formatDate(b.booking_date) %></td>
+                <td class="tg-c-actions text-nowrap">
                   <a class="btn btn-sm btn-outline-secondary" href="/app/receipt/<%= b._id %>" target="_blank" rel="noopener" title="Receipt" aria-label="View receipt"><i class="fa-solid fa-receipt" aria-hidden="true"></i></a>
                   <button class="btn btn-sm btn-outline-success" title="Add payment" onclick="tgPayBooking('<%= b._id %>', '<%= b.lead_id ? b.lead_id.name.replace(/'/g,'') : '' %>')">Pay</button>
                   <button class="btn btn-sm btn-outline-primary" title="Edit" aria-label="Edit booking"

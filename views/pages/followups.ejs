@@ -6,17 +6,26 @@
         { key: 'overdue', label: 'Overdue', cls: 'danger', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date < sot) },
         { key: 'today', label: 'Today', cls: 'primary', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date >= sot && f.scheduled_date <= eot) },
         { key: 'upcoming', label: 'Upcoming', cls: 'success', items: data.followups.filter(f => f.status === 'Pending' && f.scheduled_date > eot) },
-        { key: 'done', label: 'Completed / Other (last ' + data.followup_history_days + ' days)', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
+        { key: 'done', label: 'Done', note: 'Completed / Other (last ' + data.followup_history_days + ' days)', cls: 'secondary', items: data.followups.filter(f => f.status !== 'Pending') }
       ];
+      // Open on the first tab with something to do; Today when nothing is pending.
+      const firstTab = (buckets.slice(0, 3).find(b => b.items.length) || buckets[1]).key;
+      const chip = s => 'tg-chip tg-chip-' + String(s).toLowerCase().replace(/ /g, '-');
     %>
-    <div class="d-flex justify-content-end mb-3">
-      <button data-quick="new" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#followupModal" onclick="tgResetFollowupForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Schedule Follow-Up</button>
-    </div>
+    <div class="tg-panel">
+      <div class="d-flex flex-wrap align-items-end gap-2 mb-3">
+        <nav class="tg-status-tabs flex-grow-1" aria-label="Follow-ups by when" data-tabs>
+          <% buckets.forEach(bucket => { %>
+            <button type="button" data-tab="<%= bucket.key %>" class="<%= bucket.key === firstTab ? 'active' : '' %><%= bucket.key === 'overdue' && bucket.items.length ? ' tg-tab-alert' : '' %>" aria-pressed="<%= bucket.key === firstTab %>"><%= bucket.label %> <span class="tg-tab-count"><%= bucket.items.length %></span></button>
+          <% }) %>
+        </nav>
+        <button data-quick="new" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#followupModal" onclick="tgResetFollowupForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Schedule Follow-Up</button>
+      </div>
     <% buckets.forEach(bucket => { %>
-      <div class="tg-panel mb-3">
-        <h2 class="tg-panel-title text-<%= bucket.cls %>"><%= bucket.label %> <span class="badge text-bg-<%= bucket.cls %>"><%= bucket.items.length %></span></h2>
+      <section data-tab-panel="<%= bucket.key %>" aria-label="<%= bucket.label %>"<%= bucket.key === firstTab ? '' : ' hidden' %>>
+        <% if (bucket.note) { %><p class="text-secondary mb-2" style="font-size:13px;"><%= bucket.note %></p><% } %>
         <% if (!bucket.items.length) { %>
-          <p class="text-secondary mb-0" style="font-size:14px;">Nothing here.</p>
+          <p class="text-secondary mb-0 py-3" style="font-size:14px;">Nothing here.</p>
         <% } else { %>
           <div class="table-responsive">
             <table class="table tg-table tg-stack align-middle mb-0">
@@ -25,12 +34,12 @@
                 <% bucket.items.forEach(f => { %>
                   <tr>
                     <td class="tg-c-lead fw-medium"><%= f.lead_id ? f.lead_id.name : '—' %><div class="text-secondary" style="font-size:12px;"><%= f.lead_id ? f.lead_id.phone : '' %></div></td>
-                    <td class="tg-c-type"><span class="badge text-bg-light border"><%= f.type %></span></td>
+                    <td class="tg-c-type"><span class="tg-chip"><%= f.type %></span></td>
                     <td class="tg-c-owner<%= isManager ? '' : ' tg-m-hide' %>"><%= f.assigned_to_id ? f.assigned_to_id.full_name : '—' %></td>
-                    <td class="tg-c-when" style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
+                    <td class="tg-c-when<%= bucket.key === 'overdue' ? ' tg-overdue' : '' %>" style="font-size:13px;"><%= formatDateTime(f.scheduled_date) %></td>
                     <td class="tg-c-notes<%= f.notes ? '' : ' tg-m-hide' %> text-secondary" style="font-size:13px;max-width:180px;"><%= f.notes || '—' %></td>
                     <td class="tg-c-outcome<%= f.outcome || f.visit_outcome ? '' : ' tg-m-hide' %> text-secondary" style="font-size:13px;max-width:180px;"><% if (f.visit_outcome) { %><span class="badge text-bg-<%= f.visit_outcome === 'Interested' ? 'success' : (f.visit_outcome === 'No show' || f.visit_outcome === 'Not interested' ? 'danger' : 'secondary') %> me-1"><%= f.visit_outcome %></span><% } %><%= f.outcome || (f.visit_outcome ? '' : '—') %></td>
-                    <td class="tg-c-status"><span class="badge text-bg-<%= f.status === 'Completed' ? 'success' : (f.status === 'Pending' ? 'warning' : 'secondary') %>"><%= f.status %></span></td>
+                    <td class="tg-c-status"><span class="<%= chip('fu-' + f.status) %>"><%= f.status %></span></td>
                     <td class="tg-c-actions text-nowrap">
                       <% if (f.lead_id && f.status === 'Pending') { %><%- include('../partials/call-buttons', { lead: f.lead_id, log: true }) -%><% } %>
                       <% if (f.status === 'Pending') { %>
@@ -52,8 +61,9 @@
             </table>
           </div>
         <% } %>
-      </div>
+      </section>
     <% }) %>
+    </div>
 
     <!-- Complete follow-up hidden form -->
     <form method="POST" action="/app?page=followups" id="completeFuForm" class="d-none">
