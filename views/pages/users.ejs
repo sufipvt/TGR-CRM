@@ -4,26 +4,26 @@
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal" onclick="tgResetUserForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add User</button>
       </div>
       <div class="table-responsive">
-        <table class="table tg-table align-middle mb-0">
+        <table class="table tg-table tg-stack align-middle mb-0">
           <thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Team</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
             <% if (!data.users.length) { %><tr><td colspan="8" class="text-secondary text-center py-4">No users yet.</td></tr><% } %>
             <% data.users.forEach(u => { %>
               <tr>
-                <td class="fw-medium"><%= u.full_name %></td>
-                <td><%= u.email %></td>
-                <td><%= u.phone || '—' %></td>
-                <td><span class="badge text-bg-<%= u.role === 'Super Admin' ? 'dark' : (u.role === 'Admin' ? 'primary' : (u.role === 'Team Leader' ? 'warning' : 'info')) %>"><%= u.role %></span></td>
-                <td>
+                <td class="tg-c-lead fw-medium"><%= u.full_name %></td>
+                <td class="tg-c-phone"><%= u.email %></td>
+                <td class="tg-c-phone<%= u.phone ? '' : ' tg-m-hide' %>"><%= u.phone || '—' %></td>
+                <td class="tg-c-type"><span class="tg-chip tg-chip-role-<%= u.role.toLowerCase().replace(/ /g, '-') %>"><%= u.role %></span></td>
+                <td class="tg-c-owner<%= u.team_id ? '' : ' tg-m-hide' %>">
                   <% if (u.team_id) { %>
-                    <span class="badge text-bg-light border"><%= u.team_id.name %></span>
+                    <span class="tg-chip"><%= u.team_id.name %></span>
                   <% } else { %>
                     <span class="text-secondary">—</span>
                   <% } %>
                 </td>
-                <td><span class="badge text-bg-<%= u.status === 'Active' ? 'success' : 'secondary' %>"><%= u.status %></span></td>
-                <td class="text-secondary" style="font-size:13px;"><%= formatDate(u.created_at) %></td>
-                <td class="text-nowrap">
+                <td class="tg-c-status"><span class="tg-chip<%= u.status === 'Active' ? ' tg-chip-good' : '' %>"><%= u.status %></span></td>
+                <td class="tg-m-hide text-secondary" style="font-size:13px;"><%= formatDate(u.created_at) %></td>
+                <td class="tg-c-actions text-nowrap">
                   <button class="btn btn-sm btn-outline-primary" aria-label="Edit user"
                     onclick='tgEditUser(<%= JSON.stringify({
                       _id: String(u._id), full_name: u.full_name, email: u.email, phone: u.phone || "",

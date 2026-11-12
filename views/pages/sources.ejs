@@ -4,19 +4,19 @@
         <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#sourceModal" onclick="tgResetSourceForm()"><i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Source</button>
       </div>
       <div class="table-responsive">
-        <table class="table tg-table align-middle mb-0">
+        <table class="table tg-table tg-stack tg-src-stack align-middle mb-0">
           <thead><tr><th>Name</th><th>Channel</th><th>Status</th><th>New leads to</th><th>Notes</th><th>Actions</th></tr></thead>
           <tbody>
             <% if (!data.sources.length) { %><tr><td colspan="6" class="text-secondary text-center py-4">No sources yet.</td></tr><% } %>
             <% data.sources.forEach(s => { %>
               <tr>
-                <td class="fw-medium"><%= s.name %></td>
-                <td><span class="badge text-bg-light border"><%= s.channel || '—' %></span></td>
-                <td><span class="badge text-bg-<%= s.active ? 'success' : 'secondary' %>"><%= s.active ? 'Active' : 'Inactive' %></span></td>
+                <td class="tg-c-lead fw-medium"><%= s.name %></td>
+                <td class="tg-c-type"><span class="tg-chip"><%= s.channel || '—' %></span></td>
+                <td class="tg-c-status"><span class="tg-chip<%= s.active ? ' tg-chip-good' : '' %>"><%= s.active ? 'Active' : 'Inactive' %></span></td>
                 <% const srcTeam = s.team_id && (data.teams || []).find(t => String(t._id) === String(s.team_id)); %>
-                <td style="font-size:13px;"><%= srcTeam ? srcTeam.name : 'Any team' %></td>
-                <td class="text-secondary" style="font-size:13px;"><%= s.notes || '—' %></td>
-                <td class="text-nowrap">
+                <td class="tg-c-owner" style="font-size:13px;"><span class="d-md-none">New leads to </span><%= srcTeam ? srcTeam.name : 'Any team' %></td>
+                <td class="tg-c-notes<%= s.notes ? '' : ' tg-m-hide' %> text-secondary" style="font-size:13px;"><%= s.notes || '—' %></td>
+                <td class="tg-c-actions text-nowrap">
                   <button class="btn btn-sm btn-outline-primary" aria-label="Edit source"
                     onclick='tgEditSource(<%= JSON.stringify({ _id: String(s._id), name: s.name, channel: s.channel || "Online", active: s.active, notes: s.notes || "", team_id: s.team_id ? String(s.team_id) : "" }) %>)'><i class="fa-solid fa-pen" aria-hidden="true"></i></button>
                   <form method="POST" action="/app?page=sources" class="d-inline" onsubmit="return confirm('Delete this source?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="table" value="sources"><input type="hidden" name="id" value="<%= s._id %>"><button type="submit" class="btn btn-sm btn-outline-danger" aria-label="Delete source"><i class="fa-solid fa-trash" aria-hidden="true"></i></button></form>

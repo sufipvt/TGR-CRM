@@ -248,3 +248,51 @@ html[data-text="large"] body { zoom: 1.15; }
 [data-bs-theme="dark"] .tg-table tbody tr:hover { background: #22304a; }
 [data-bs-theme="dark"] .btn-outline-secondary { background: transparent; color: #cbd5e1; border-color: #475569; }
 [data-bs-theme="dark"] .btn-outline-secondary:hover { background: #273449; color: #f1f5f9; border-color: #64748b; }
+
+/* ---------------- Admin pages: semantic and role chips ---------------- */
+.tg-chip-sm { font-size: 11px; padding: 2px 8px; }
+.tg-chip-good { background: #d1fae5; color: #065f46; }
+.tg-chip-bad  { background: #fde8e8; color: #9b1c1c; }
+.tg-chip-info { background: #e1eaff; color: #1e429f; }
+.tg-chip-not-interested { background: #fde8e8; color: #9b1c1c; }
+.tg-chip-role-super-admin     { background: #1f2937; color: #f9fafb; }
+.tg-chip-role-admin           { background: #e1eaff; color: #1e429f; }
+.tg-chip-role-team-leader     { background: #fef3c7; color: #92400e; }
+.tg-chip-role-sub-team-leader { background: #eef0f4; color: var(--ink-2); }
+.tg-chip-audit-create     { background: #d1fae5; color: #065f46; }
+.tg-chip-audit-update     { background: #fef3c7; color: #92400e; }
+.tg-chip-audit-delete     { background: #fde8e8; color: #9b1c1c; }
+.tg-chip-audit-login      { background: #e1eaff; color: #1e429f; }
+.tg-chip-audit-csv_import { background: #ffedd5; color: #9a3412; }
+
+.tg-member-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.tg-member-row:last-child { border-bottom: 0; }
+
+/* Numbers line up in tables and counts */
+.tg-num, .tg-c-money, .tg-kpi-value, .tg-mini-value, .tg-tab-count { font-variant-numeric: tabular-nums; }
+
+/* ---------------- Browser surfaces ---------------- */
+:root { accent-color: var(--brand); }
+::selection { background: #c7d7fe; color: var(--ink); }
+.tg-content a:not(.btn):not(.tg-kpi-link) { text-underline-offset: 3px; }
+.tg-content a:not(.btn):focus-visible, .btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; box-shadow: none; }
+
+[data-bs-theme="dark"] ::selection { background: #1e3a8a; color: #f1f5f9; }
+[data-bs-theme="dark"] .tg-member-row { border-color: #334155; }
+[data-bs-theme="dark"] .tg-chip-good,
+[data-bs-theme="dark"] .tg-chip-audit-create { background: rgba(16,185,129,0.2); color: #a7f3d0; }
+[data-bs-theme="dark"] .tg-chip-bad,
+[data-bs-theme="dark"] .tg-chip-not-interested,
+[data-bs-theme="dark"] .tg-chip-audit-delete { background: rgba(239,68,68,0.2); color: #fecaca; }
+[data-bs-theme="dark"] .tg-chip-info,
+[data-bs-theme="dark"] .tg-chip-role-admin,
+[data-bs-theme="dark"] .tg-chip-audit-login { background: rgba(59,130,246,0.22); color: #bfdbfe; }
+[data-bs-theme="dark"] .tg-chip-role-team-leader,
+[data-bs-theme="dark"] .tg-chip-audit-update { background: rgba(245,158,11,0.2); color: #fde68a; }
+[data-bs-theme="dark"] .tg-chip-audit-csv_import { background: rgba(249,115,22,0.2); color: #fed7aa; }
+[data-bs-theme="dark"] .tg-chip-role-super-admin { background: #e2e8f0; color: #0f172a; }
+[data-bs-theme="dark"] .tg-chip-role-sub-team-leader { background: #334155; color: #e2e8f0; }
+@media (max-width: 767.98px) {
+  .tg-stack .tg-c-phone + .tg-c-phone::before { content: "· "; }
+  .tg-src-stack .tg-c-owner::before { content: none; }
+}
