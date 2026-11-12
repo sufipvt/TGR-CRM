@@ -47,7 +47,7 @@
           <thead><tr><th>Status</th><th>Count</th></tr></thead>
           <tbody>
             <% data.conversion_report.funnel.forEach(f => { %>
-              <tr><td><span class="badge text-bg-<%= statusColors[f._id] || 'secondary' %>"><%= f._id %></span></td><td><%= f.count %></td></tr>
+              <tr><td><span class="tg-chip tg-chip-<%= String(f._id).toLowerCase().replace(/ /g, '-') %>"><%= f._id %></span></td><td class="tg-num"><%= f.count %></td></tr>
             <% }) %>
           </tbody>
         </table>
@@ -91,7 +91,7 @@
             <% } %>
             <% data.loss_analysis.forEach(l => { %>
               <tr>
-                <td><span class="badge text-bg-<%= statusColors[l._id.status] || 'secondary' %>"><%= l._id.status %></span></td>
+                <td><span class="tg-chip tg-chip-<%= String(l._id.status).toLowerCase().replace(/ /g, '-') %>"><%= l._id.status %></span></td>
                 <td><%= l._id.reason %></td>
                 <td><%= l.count %></td>
               </tr>
@@ -123,7 +123,7 @@
       <% if (Object.keys(SV.outcomes).length) { %>
         <div class="d-flex flex-wrap gap-2 mb-3" style="font-size:13px;">
           <% Object.entries(SV.outcomes).sort((a, b) => b[1] - a[1]).forEach(([o, n]) => { %>
-            <span class="badge text-bg-light border"><%= o %>: <%= n %></span>
+            <span class="tg-chip"><%= o %>: <span class="tg-num"><%= n %></span></span>
           <% }) %>
         </div>
       <% } %>
@@ -160,7 +160,7 @@
             <% data.performance_report.forEach(p => { %>
               <tr>
                 <td class="fw-medium"><%= p.name %></td>
-                <td><span class="badge text-bg-light border"><%= p.role %></span></td>
+                <td><span class="tg-chip tg-chip-role-<%= String(p.role).toLowerCase().replace(/ /g, '-') %>"><%= p.role %></span></td>
                 <td><%= p.leads %></td>
                 <td><%= p.qualified %></td>
                 <td><%= p.bookings %></td>

@@ -8,10 +8,10 @@
             <div>
               <div style="font-size:14px;">
                 <span class="fw-medium"><%= a.user_email %></span>
-                <span class="badge text-bg-light border mx-1"><%= a.action %></span>
+                <span class="tg-chip tg-chip-sm tg-chip-audit-<%= a.action %> mx-1"><%= a.action.replace(/_/g, ' ') %></span>
                 <span class="text-secondary"><%= a.entity %><%= a.entity_id ? ' #' + a.entity_id.slice(-6).toUpperCase() : '' %></span>
               </div>
-              <div class="text-secondary" style="font-size:12px;"><%= formatDateTime(a.created_at) %><%= a.details && Object.keys(a.details).length ? ' · ' + JSON.stringify(a.details) : '' %></div>
+              <div class="text-secondary" style="font-size:12px;"><%= formatDateTime(a.created_at) %><%= a.details && Object.keys(a.details).length ? ' · ' + Object.entries(a.details).map(([k, v]) => k.replace(/_/g, ' ') + ': ' + (v && typeof v === 'object' ? JSON.stringify(v) : v)).join(' · ') : '' %></div>
             </div>
           </div>
         <% }) %>
